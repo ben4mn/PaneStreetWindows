@@ -44,13 +44,13 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI5RTVCMEYzQ0M0MTk4QTAKUldTZ21FSE04N0RsdWRsM0o4clV0SXBGV3FhQzVHeWJaeFhSdHFiUnJHb2YyWk9hZ1lobzhWQjcK",
       "endpoints": [
-        "https://github.com/ben4mn/PaneStreet/releases/latest/download/latest.json"
+        "https://github.com/ben4mn/PaneStreetWindows/releases/latest/download/latest.json"
       ]
     }
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": true,
+    "createUpdaterArtifacts": false,
     "targets": "all",
     "icon": [
       "icons/32x32.png",

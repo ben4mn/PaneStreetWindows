@@ -288,10 +288,39 @@ fn get_process_cwd_impl(pid: u32) -> Result<Option<String>, String> {
 }
 
 #[cfg(windows)]
-fn get_process_cwd_impl(_pid: u32) -> Result<Option<String>, String> {
-    // Windows has no direct equivalent of lsof for CWD detection.
-    // Return None gracefully — the frontend handles this by not updating the CWD display.
-    Ok(None)
+fn get_process_cwd_impl(pid: u32) -> Result<Option<String>, String> {
+    // Use wmic (fast, no PowerShell startup overhead) to find the shell's
+    // most recent child process and infer CWD from it.
+    // When user runs a command after `cd`, the child inherits the shell's CWD.
+    let output = crate::cmd_util::silent_cmd("wmic")
+        .args([
+            "process", "where",
+            &format!("ParentProcessId={}", pid),
+            "get", "ExecutablePath",
+            "/format:list",
+        ])
+        .output();
+
+    if let Ok(output) = output {
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines().rev() {
+                if let Some(path_str) = line.strip_prefix("ExecutablePath=") {
+                    let path_str = path_str.trim();
+                    if !path_str.is_empty() {
+                        if let Some(parent) = std::path::Path::new(path_str).parent() {
+                            if parent.exists() {
+                                return Ok(Some(parent.to_string_lossy().to_string()));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: return the user's home directory so the file viewer has something to show
+    Ok(dirs::home_dir().map(|h| h.to_string_lossy().to_string()))
 }
 
 #[tauri::command]

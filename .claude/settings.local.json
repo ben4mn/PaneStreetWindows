@@ -45,7 +45,15 @@
       "Bash(export PATH=/c/Users/ben4m/.cargo/bin:$PATH)",
       "Bash(git init:*)",
       "Bash(git remote:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git rm:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(gh release:*)",
+      "Bash(taskkill.exe /F /PID 10444)",
+      "Bash(cmd.exe /c \"taskkill /F /IM pane-street.exe\")",
+      "Bash(powershell.exe -Command 'Stop-Process -Name pane-street -Force')"
     ]
   }
 }
