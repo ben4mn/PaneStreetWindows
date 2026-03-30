@@ -1,0 +1,63 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nickel-org/nickel/refs/heads/master/schema/tauri-conf.json",
+  "productName": "PaneStreet",
+  "version": "0.4.8",
+  "identifier": "com.panestreet.app",
+  "build": {
+    "frontendDist": "../src"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "capabilities": [
+        {
+          "identifier": "default",
+          "windows": ["*"],
+          "permissions": [
+            "core:default",
+            "core:window:allow-start-dragging",
+            "opener:default",
+            "dialog:default",
+            "notification:default",
+            "notification:allow-notify",
+            "notification:allow-request-permission",
+            "notification:allow-is-permission-granted",
+            "updater:default",
+            "process:allow-restart"
+          ]
+        }
+      ]
+    },
+    "windows": [
+      {
+        "title": "Pane Street",
+        "width": 1400,
+        "height": 900,
+        "resizable": true,
+        "fullscreen": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      }
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI5RTVCMEYzQ0M0MTk4QTAKUldTZ21FSE04N0RsdWRsM0o4clV0SXBGV3FhQzVHeWJaeFhSdHFiUnJHb2YyWk9hZ1lobzhWQjcK",
+      "endpoints": [
+        "https://github.com/ben4mn/PaneStreet/releases/latest/download/latest.json"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

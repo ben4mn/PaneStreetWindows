@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pane Street</title>
+  <link rel="stylesheet" href="vendor/xterm/xterm.css">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+  <div id="app">
+    <div id="sidebar">
+      <div class="resize-handle resize-handle-right" id="sidebar-resize"></div>
+      <div id="sidebar-header">
+        <h2>Sessions</h2>
+        <div id="sidebar-header-actions">
+          <button id="sidebar-toggle" class="sidebar-header-btn" title="Collapse sidebar">&#8249;</button>
+        </div>
+      </div>
+      <button id="new-session-btn"><span class="btn-icon">+</span><span class="btn-text"> New Terminal</span></button>
+      <div id="session-list"></div>
+      <div id="sidebar-actions">
+        <button id="config-scheduled-btn" data-icon="&#9201;"><span class="btn-text">Scheduled</span></button>
+        <button id="config-plugins-btn" data-icon="&#9881;"><span class="btn-text">Plugins</span></button>
+        <button id="config-mcps-btn" data-icon="&#9879;"><span class="btn-text">MCPs</span></button>
+        <button id="config-memory-btn" data-icon="&#9733;"><span class="btn-text">Memory</span></button>
+        <button id="settings-btn" data-icon="&#9881;"><span class="btn-text">Settings</span></button>
+      </div>
+    </div>
+    <div id="main">
+      <div id="toolbar">
+        <div id="toolbar-left">
+          <div id="toolbar-layout-toggle"></div>
+        </div>
+        <div id="toolbar-right">
+          <button id="notification-toggle-btn" class="toolbar-btn" title="Notifications (&#8984;I)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.5a4.5 4.5 0 00-4.5 4.5c0 2.5-1.5 4-1.5 4h12s-1.5-1.5-1.5-4A4.5 4.5 0 008 1.5z"/><path d="M6 13a2 2 0 004 0"/></svg><span id="notification-count-badge" class="notification-count-badge" style="display:none">0</span> <span class="toolbar-btn-label">Alerts</span></button>
+          <button id="fv-toggle-btn" class="toolbar-btn" title="Toggle file viewer (&#8984;&#8679;E)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3.5A1.5 1.5 0 013.5 2h3l2 2h4A1.5 1.5 0 0114 5.5v7a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 12.5z"/></svg> <span class="toolbar-btn-label">Files</span></button>
+        </div>
+      </div>
+      <div id="content-area">
+        <div id="pane-grid"></div>
+        <div id="settings-panel" class="config-panel" style="display:none"></div>
+        <div id="plugins-panel" class="config-panel" style="display:none"></div>
+        <div id="mcps-panel" class="config-panel" style="display:none"></div>
+        <div id="memory-panel" class="config-panel" style="display:none"></div>
+        <div id="scheduled-panel" class="config-panel" style="display:none"></div>
+      </div>
+      <div id="notification-panel" style="display:none">
+        <div class="notif-panel-header">
+          <h2>Notifications</h2>
+          <div class="notif-panel-actions">
+            <button id="notif-clear-btn" class="fv-action-btn" title="Clear all">Clear</button>
+            <button id="notif-close-btn" class="fv-action-btn" title="Close">&times;</button>
+          </div>
+        </div>
+        <div id="notif-content" class="notif-panel-body"></div>
+      </div>
+      <div id="file-viewer" style="display:none" tabindex="0">
+        <div class="resize-handle resize-handle-left" id="fv-resize"></div>
+        <div class="file-viewer-header">
+          <button id="fv-back" class="fv-nav-btn" title="Go to parent directory">&#8593;</button>
+          <span class="file-viewer-path" id="fv-path"></span>
+          <div class="file-viewer-actions">
+            <button id="fv-toggle-view" class="fv-action-btn" title="Toggle rendered/raw" style="display:none">Raw</button>
+            <button id="fv-open-default" class="fv-action-btn" title="Open with default app" style="display:none">Open</button>
+            <button id="fv-finder" class="fv-action-btn" title="Open in Finder">Finder</button>
+            <button id="fv-close" class="fv-action-btn" title="Close">&times;</button>
+          </div>
+        </div>
+        <div class="file-viewer-tree" id="fv-tree"></div>
+        <div class="file-viewer-content" id="fv-content" style="display:none"></div>
+      </div>
+      <div id="footer">
+        <div class="resize-handle resize-handle-top" id="footer-resize-handle"></div>
+        <button id="footer-expand-toggle" class="footer-chevron" title="Expand git timeline" style="display:none">&#9662;</button>
+        <span id="footer-git"></span>
+        <span id="footer-pills"></span>
+        <div id="footer-branch-graph" class="footer-branch-graph"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Robot overlay (above all content) -->
+  <div id="robot-overlay">
+    <span id="footer-mascot">
+      <span id="mascot-speech" class="mascot-speech"></span>
+      <svg viewBox="0 0 28 28" width="56" height="56" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g class="robot-body">
+          <!-- Antenna -->
+          <g class="robot-antenna">
+            <line x1="14" y1="5" x2="14" y2="2" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"/>
+            <circle cx="14" cy="1.5" r="1.5" fill="var(--accent)"/>
+          </g>
+          <!-- Head -->
+          <g class="robot-head">
+            <rect x="7" y="5" width="14" height="10" rx="3" fill="var(--text-secondary)"/>
+            <rect x="7" y="5" width="14" height="10" rx="3" stroke="var(--text-muted)" stroke-width="0.5"/>
+            <!-- Eyes -->
+            <g class="robot-eyes">
+              <circle cx="11" cy="10" r="2" fill="#111"/>
+              <circle cx="11" cy="9.5" r="1.2" fill="var(--accent)"/>
+              <circle cx="10.3" cy="9" r="0.5" fill="#fff" opacity="0.7"/>
+              <circle cx="17" cy="10" r="2" fill="#111"/>
+              <circle cx="17" cy="9.5" r="1.2" fill="var(--accent)"/>
+              <circle cx="16.3" cy="9" r="0.5" fill="#fff" opacity="0.7"/>
+            </g>
+            <!-- Mouth -->
+            <path d="M11 13 Q14 15 17 13" stroke="var(--text-muted)" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+          </g>
+          <!-- Body -->
+          <rect x="9" y="16" width="10" height="6" rx="2" fill="var(--text-muted)"/>
+          <!-- Chest light -->
+          <circle class="robot-chest-glow" cx="14" cy="19" r="1.5" fill="var(--accent)" opacity="0.8"/>
+          <!-- Arms -->
+          <rect class="robot-arm-l" x="5" y="17" width="3" height="4" rx="1.5" fill="var(--text-secondary)"/>
+          <rect class="robot-arm-r" x="20" y="17" width="3" height="4" rx="1.5" fill="var(--text-secondary)"/>
+          <!-- Legs with feet as single groups -->
+          <g class="robot-leg-left">
+            <rect x="10" y="22" width="3" height="3.5" rx="1" fill="var(--text-secondary)"/>
+            <rect x="9" y="25" width="5" height="2" rx="1" fill="var(--text-secondary)"/>
+          </g>
+          <g class="robot-leg-right">
+            <rect x="15" y="22" width="3" height="3.5" rx="1" fill="var(--text-secondary)"/>
+            <rect x="14" y="25" width="5" height="2" rx="1" fill="var(--text-secondary)"/>
+          </g>
+        </g>
+        <ellipse class="robot-shadow" cx="14" cy="27" rx="8" ry="1.5" fill="rgba(0,0,0,0.15)"/>
+      </svg>
+    </span>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

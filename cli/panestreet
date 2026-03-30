@@ -1,0 +1,81 @@
+#!/bin/bash
+# PaneStreet CLI — communicates with PaneStreet via Unix domain socket
+# Usage:
+#   panestreet ping
+#   panestreet list-sessions
+#   panestreet write <session_id> <text>
+#   panestreet notify [--title TITLE] <message>
+#   panestreet focus <session_id>
+#   panestreet status <session_id>
+
+SOCKET="$HOME/.pane-street/panestreet.sock"
+
+if [ ! -S "$SOCKET" ]; then
+  echo "Error: PaneStreet is not running (socket not found at $SOCKET)" >&2
+  exit 1
+fi
+
+send_command() {
+  echo "$1" | nc -U "$SOCKET" -w 2 2>/dev/null || socat - UNIX-CONNECT:"$SOCKET" <<< "$1" 2>/dev/null
+}
+
+case "$1" in
+  ping)
+    send_command '{"cmd":"ping"}'
+    ;;
+  list-sessions|ls)
+    send_command '{"cmd":"list-sessions"}'
+    ;;
+  write)
+    if [ -z "$2" ] || [ -z "$3" ]; then
+      echo "Usage: panestreet write <session_id> <text>" >&2
+      exit 1
+    fi
+    # Escape the data for JSON
+    DATA=$(printf '%s' "$3" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null || echo "\"$3\"")
+    send_command "{\"cmd\":\"write\",\"session_id\":\"$2\",\"data\":$DATA}"
+    ;;
+  notify)
+    TITLE="PaneStreet"
+    BODY=""
+    shift
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --title|-t) TITLE="$2"; shift 2 ;;
+        *) BODY="$1"; shift ;;
+      esac
+    done
+    TITLE_JSON=$(printf '%s' "$TITLE" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null || echo "\"$TITLE\"")
+    BODY_JSON=$(printf '%s' "$BODY" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))' 2>/dev/null || echo "\"$BODY\"")
+    send_command "{\"cmd\":\"notify\",\"title\":$TITLE_JSON,\"body\":$BODY_JSON}"
+    ;;
+  focus)
+    if [ -z "$2" ]; then
+      echo "Usage: panestreet focus <session_id>" >&2
+      exit 1
+    fi
+    send_command "{\"cmd\":\"focus\",\"session_id\":\"$2\"}"
+    ;;
+  status)
+    if [ -z "$2" ]; then
+      echo "Usage: panestreet status <session_id>" >&2
+      exit 1
+    fi
+    send_command "{\"cmd\":\"get-status\",\"session_id\":\"$2\"}"
+    ;;
+  help|--help|-h)
+    echo "PaneStreet CLI"
+    echo ""
+    echo "Commands:"
+    echo "  ping                         Check if PaneStreet is running"
+    echo "  list-sessions (ls)           List active terminal sessions"
+    echo "  write <id> <text>            Send text to a session"
+    echo "  notify [--title T] <msg>     Send a notification"
+    echo "  focus <id>                   Focus a session"
+    echo "  status <id>                  Get session status"
+    ;;
+  *)
+    echo "Unknown command: $1. Use 'panestreet help' for usage." >&2
+    exit 1
+    ;;
+esac

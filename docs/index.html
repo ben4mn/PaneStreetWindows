@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PaneStreet — Modern Terminal Multiplexer for macOS, Windows & Linux</title>
+  <meta name="description" content="PaneStreet is a GPU-accelerated terminal multiplexer built with Tauri and Rust. Multi-pane layouts, 16 themes, file browser, Claude AI integration. Free and open source.">
+  <meta name="keywords" content="terminal multiplexer, terminal emulator, tmux alternative, tauri app, rust terminal, xterm.js, multi-pane terminal, Claude AI, developer tools, macOS terminal">
+  <meta property="og:title" content="PaneStreet — Modern Terminal Multiplexer">
+  <meta property="og:description" content="GPU-accelerated terminal multiplexer with multi-pane layouts, 16 themes, and Claude AI integration. Built with Tauri and Rust.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://ben4mn.github.io/PaneStreet/">
+  <meta property="og:image" content="https://raw.githubusercontent.com/ben4mn/PaneStreet/main/docs/screenshots/hero.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/ben4mn/PaneStreet/main/icon.png">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0a0a;
+      --bg-card: #141414;
+      --bg-card-hover: #1a1a1a;
+      --text: #e0e0e0;
+      --text-dim: #888;
+      --text-bright: #fff;
+      --accent: #2a6df0;
+      --accent-glow: rgba(42, 109, 240, 0.15);
+      --border: #222;
+      --radius: 12px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Nav */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(10, 10, 10, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .nav-brand {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 1.1rem; font-weight: 600; color: var(--text-bright);
+    }
+    .nav-brand img { width: 32px; height: 32px; border-radius: 6px; }
+    .nav-links { display: flex; gap: 1.5rem; align-items: center; }
+    .nav-links a { color: var(--text-dim); font-size: 0.9rem; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--text-bright); text-decoration: none; }
+    .nav-links .btn-sm {
+      background: var(--accent); color: #fff; padding: 6px 16px;
+      border-radius: 8px; font-weight: 500; transition: opacity 0.2s;
+    }
+    .nav-links .btn-sm:hover { opacity: 0.85; }
+
+    /* Hero */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 8rem 2rem 4rem;
+      position: relative;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-icon { width: 96px; height: 96px; border-radius: 20px; margin-bottom: 2rem; position: relative; }
+    .hero h1 {
+      font-size: clamp(2.5rem, 5vw, 4rem); font-weight: 700;
+      color: var(--text-bright); letter-spacing: -0.02em; margin-bottom: 1rem;
+    }
+    .hero .tagline {
+      font-size: clamp(1.1rem, 2vw, 1.35rem); color: var(--text-dim);
+      max-width: 600px; margin-bottom: 2.5rem;
+    }
+    .hero-buttons { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 12px 28px; border-radius: 10px; font-size: 1rem;
+      font-weight: 500; transition: all 0.2s; border: none; cursor: pointer;
+    }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { opacity: 0.85; text-decoration: none; }
+    .btn-secondary {
+      background: transparent; color: var(--text); border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: #444; text-decoration: none; }
+    .btn svg { width: 18px; height: 18px; }
+
+    .hero-screenshot {
+      margin-top: 4rem; max-width: 900px; width: 100%;
+      border-radius: 12px; border: 1px solid var(--border);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .hero-video {
+      margin-top: 4rem; max-width: 960px; width: 100%;
+      border-radius: 12px; border: 1px solid var(--border);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    /* Sections */
+    section { padding: 6rem 2rem; max-width: 1100px; margin: 0 auto; }
+    .section-title {
+      font-size: 2rem; font-weight: 700; color: var(--text-bright);
+      text-align: center; margin-bottom: 0.75rem;
+    }
+    .section-subtitle {
+      color: var(--text-dim); text-align: center;
+      max-width: 500px; margin: 0 auto 3rem;
+    }
+
+    /* Feature grid */
+    .features-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.25rem;
+    }
+    .feature-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1.75rem;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .feature-card:hover { background: var(--bg-card-hover); border-color: #333; }
+    .feature-icon { margin-bottom: 0.75rem; color: var(--accent); }
+    .feature-icon svg { width: 28px; height: 28px; }
+    .feature-card h3 { font-size: 1.1rem; color: var(--text-bright); margin-bottom: 0.5rem; }
+    .feature-card p { color: var(--text-dim); font-size: 0.92rem; line-height: 1.5; }
+
+    /* Themes section */
+    .themes-list {
+      display: flex; flex-wrap: wrap; gap: 0.5rem;
+      justify-content: center; margin-top: 1.5rem;
+    }
+    .theme-pill {
+      padding: 6px 14px; border-radius: 20px; font-size: 0.85rem;
+      background: var(--bg-card); border: 1px solid var(--border); color: var(--text-dim);
+    }
+
+    /* Screenshot gallery */
+    .gallery {
+      display: grid; grid-template-columns: 1fr; gap: 2rem;
+      margin-top: 2rem;
+    }
+    .gallery img {
+      width: 100%; border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+    }
+    .gallery figure { text-align: center; }
+    .gallery figcaption {
+      margin-top: 0.75rem; color: var(--text-dim); font-size: 0.9rem;
+    }
+
+    /* Install section */
+    .install-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.5rem;
+    }
+    .install-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 2rem;
+    }
+    .install-card h3 { color: var(--text-bright); margin-bottom: 1rem; }
+    .install-card p { color: var(--text-dim); font-size: 0.92rem; margin-bottom: 1rem; }
+    .install-card code {
+      display: block; background: #0d0d0d; color: #ccc;
+      padding: 1rem; border-radius: 8px; font-size: 0.85rem;
+      overflow-x: auto; white-space: pre; line-height: 1.6;
+    }
+    .install-note {
+      margin-top: 1rem; padding: 1rem; background: rgba(42,109,240,0.08);
+      border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0;
+      color: var(--text-dim); font-size: 0.85rem;
+    }
+
+    /* Shortcuts table */
+    .shortcuts-table {
+      width: 100%; max-width: 600px; margin: 0 auto;
+      border-collapse: collapse;
+    }
+    .shortcuts-table th, .shortcuts-table td {
+      padding: 0.6rem 1rem; text-align: left; border-bottom: 1px solid var(--border);
+    }
+    .shortcuts-table th { color: var(--text-dim); font-weight: 500; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .shortcuts-table td { color: var(--text); font-size: 0.92rem; }
+    .shortcuts-table kbd {
+      background: var(--bg-card); border: 1px solid var(--border);
+      padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;
+      font-family: -apple-system, BlinkMacSystemFont, monospace;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 3rem 2rem; text-align: center;
+      color: var(--text-dim); font-size: 0.85rem;
+    }
+    footer a { color: var(--text-dim); }
+    footer a:hover { color: var(--text-bright); }
+    .footer-links { display: flex; gap: 1.5rem; justify-content: center; margin-bottom: 1rem; }
+
+    /* Responsive */
+    @media (max-width: 640px) {
+      nav { padding: 0 1rem; }
+      .nav-links a:not(.btn-sm) { display: none; }
+      section { padding: 4rem 1rem; }
+      .features-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">
+    <img src="https://raw.githubusercontent.com/ben4mn/PaneStreet/main/icon.png" alt="PaneStreet icon">
+    PaneStreet
+  </div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#screenshots">Screenshots</a>
+    <a href="#install">Install</a>
+    <a href="https://github.com/ben4mn/PaneStreet" class="btn-sm">
+      <svg viewBox="0 0 16 16" fill="currentColor" style="width:16px;height:16px;vertical-align:middle;margin-right:4px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<div class="hero">
+  <img src="https://raw.githubusercontent.com/ben4mn/PaneStreet/main/icon.png" alt="PaneStreet" class="hero-icon">
+  <h1>PaneStreet</h1>
+  <p class="tagline">A modern, GPU-accelerated terminal multiplexer with multi-pane layouts, 16 themes, and Claude AI integration. Built with Tauri and Rust.</p>
+  <div class="hero-buttons">
+    <a href="https://github.com/ben4mn/PaneStreet/releases/latest" class="btn btn-primary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Download for macOS
+    </a>
+    <a href="https://github.com/ben4mn/PaneStreet" class="btn btn-secondary">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+      View on GitHub
+    </a>
+  </div>
+  <video class="hero-video" autoplay loop muted playsinline poster="screenshots/hero.png">
+    <source src="panestreet-demo.mp4" type="video/mp4">
+    <img src="screenshots/hero.png" alt="PaneStreet demo" class="hero-screenshot">
+  </video>
+</div>
+
+<!-- Features -->
+<section id="features">
+  <h2 class="section-title">Everything you need in a terminal</h2>
+  <p class="section-subtitle">A batteries-included terminal multiplexer that doesn't make you read a manual first.</p>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+      <h3>Multi-Pane Layouts</h3>
+      <p>Auto-grid, freeform drag-and-drop, or edge-snap tiling. Manage up to 9 terminals in a single window with one-key switching.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
+      <h3>GPU-Accelerated</h3>
+      <p>Powered by xterm.js with WebGL rendering. Smooth scrolling and fast output even with heavy log streams.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>
+      <h3>Built-in File Browser</h3>
+      <p>Browse files without leaving the app. The file viewer tracks your terminal's working directory automatically.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></div>
+      <h3>16+ Built-in Themes</h3>
+      <p>Dracula, Nord, Tokyo Night, Catppuccin, Synthwave 84, and more. Plus a full color editor for custom themes.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+      <h3>Smart Notifications</h3>
+      <p>Friendly notification sidebar, pulsing glow rings, and an in-app mascot that relays alerts from other terminals. Plus native desktop alerts and OSC 9/99/777 support.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4v2H8V6a4 4 0 0 1 4-4z"/><rect x="4" y="8" width="16" height="12" rx="2"/><circle cx="12" cy="15" r="2"/><line x1="12" y1="17" x2="12" y2="19"/></svg></div>
+      <h3>Claude AI Integration</h3>
+      <p>View installed plugins, MCP servers, and project memory. Shift+Enter support for Claude Code. Socket API for external script control.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M8 14h8l1 8H7l1-8z"/></svg></div>
+      <h3>Interactive Robot Mascot</h3>
+      <p>An animated companion that reacts to your terminal activity, relays notifications, and has a personality. Click it and find out.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/></svg></div>
+      <h3>Customizable Shortcuts</h3>
+      <p>Every shortcut is rebindable. Directional pane navigation with Cmd+Opt Arrows. Your muscle memory, your rules.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Themes -->
+<section>
+  <h2 class="section-title">16 Themes. Zero Config.</h2>
+  <p class="section-subtitle">Switch themes instantly. Or build your own with the color editor.</p>
+  <img src="screenshots/themes.png" alt="PaneStreet theme selection showing multiple color schemes" style="width:100%;max-width:800px;display:block;margin:0 auto;border-radius:12px;border:1px solid var(--border);box-shadow:0 8px 30px rgba(0,0,0,0.3)">
+  <div class="themes-list">
+    <span class="theme-pill">Dark</span>
+    <span class="theme-pill">Midnight Blue</span>
+    <span class="theme-pill">Dracula</span>
+    <span class="theme-pill">Nord</span>
+    <span class="theme-pill">Solarized Dark</span>
+    <span class="theme-pill">Gruvbox Dark</span>
+    <span class="theme-pill">Tokyo Night</span>
+    <span class="theme-pill">One Dark</span>
+    <span class="theme-pill">Catppuccin Mocha</span>
+    <span class="theme-pill">Rose Pine</span>
+    <span class="theme-pill">Kanagawa</span>
+    <span class="theme-pill">Everforest</span>
+    <span class="theme-pill">Synthwave 84</span>
+    <span class="theme-pill">Ayu Dark</span>
+    <span class="theme-pill">Horizon</span>
+    <span class="theme-pill">Moonlight</span>
+  </div>
+</section>
+
+<!-- Screenshots -->
+<section id="screenshots">
+  <h2 class="section-title">See it in action</h2>
+  <p class="section-subtitle">A few looks at what you're getting.</p>
+  <div class="gallery">
+    <figure>
+      <img src="screenshots/file-browser.png" alt="PaneStreet file browser panel with git diff indicators">
+      <figcaption>File browser with git diff indicators</figcaption>
+    </figure>
+    <figure>
+      <img src="screenshots/scheduled.png" alt="PaneStreet scheduled tasks panel showing active Claude sessions">
+      <figcaption>Claude session monitor and scheduled tasks</figcaption>
+    </figure>
+    <figure>
+      <img src="screenshots/git-footer.png" alt="PaneStreet expandable git branch timeline">
+      <figcaption>Expandable git branch timeline</figcaption>
+    </figure>
+    <figure>
+      <img src="screenshots/settings.png" alt="PaneStreet settings panel with customization options">
+      <figcaption>Deep customization and theme selection</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- Install -->
+<section id="install">
+  <h2 class="section-title">Get Started</h2>
+  <p class="section-subtitle">Download the app or build from source.</p>
+  <div class="install-grid">
+    <div class="install-card">
+      <h3>Homebrew</h3>
+      <p>The fastest way to install on macOS.</p>
+      <code>brew tap ben4mn/panestreet
+brew install --cask panestreet</code>
+    </div>
+    <div class="install-card">
+      <h3>Download</h3>
+      <p>Grab the latest release for macOS. Windows and Linux builds coming soon.</p>
+      <a href="https://github.com/ben4mn/PaneStreet/releases/latest" class="btn btn-primary" style="width:100%;justify-content:center">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download .dmg
+      </a>
+      <div class="install-note">
+        <strong>macOS note:</strong> The app is not yet code-signed. Right-click the app and select <strong>Open</strong> on first launch, or go to System Settings &rarr; Privacy &amp; Security &rarr; Open Anyway.
+      </div>
+    </div>
+    <div class="install-card">
+      <h3>Build from Source</h3>
+      <p>Requires Node.js 18+, Rust, and the Tauri CLI.</p>
+      <code>git clone https://github.com/ben4mn/PaneStreet.git
+cd PaneStreet
+npm install
+npm run tauri build</code>
+    </div>
+  </div>
+</section>
+
+<!-- Shortcuts -->
+<section>
+  <h2 class="section-title">Keyboard Shortcuts</h2>
+  <p class="section-subtitle">All shortcuts are rebindable in Settings.</p>
+  <table class="shortcuts-table">
+    <thead><tr><th>Action</th><th>Shortcut</th></tr></thead>
+    <tbody>
+      <tr><td>New Terminal</td><td><kbd>&#8984; N</kbd></td></tr>
+      <tr><td>Close Terminal</td><td><kbd>&#8984; W</kbd></td></tr>
+      <tr><td>Settings</td><td><kbd>&#8984; ,</kbd></td></tr>
+      <tr><td>Toggle Sidebar</td><td><kbd>&#8984; B</kbd></td></tr>
+      <tr><td>File Browser</td><td><kbd>&#8679; &#8984; E</kbd></td></tr>
+      <tr><td>Maximize Pane</td><td><kbd>&#8679; &#8984; Enter</kbd></td></tr>
+      <tr><td>Toggle Layout Mode</td><td><kbd>&#8679; &#8984; G</kbd></td></tr>
+      <tr><td>Navigate Panes</td><td><kbd>&#8984; &#8997; Arrow</kbd></td></tr>
+      <tr><td>Notifications</td><td><kbd>&#8984; I</kbd></td></tr>
+      <tr><td>Switch to Pane 1-9</td><td><kbd>&#8984; 1</kbd> &ndash; <kbd>&#8984; 9</kbd></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-links">
+    <a href="https://github.com/ben4mn/PaneStreet">GitHub</a>
+    <a href="https://github.com/ben4mn/PaneStreet/releases">Releases</a>
+    <a href="https://github.com/ben4mn/PaneStreet/issues">Issues</a>
+    <a href="https://github.com/ben4mn/PaneStreet/blob/main/LICENSE">MIT License</a>
+  </div>
+  <p>Built by <a href="https://github.com/ben4mn">ben4mn</a> &middot; PaneStreet &copy; 2026</p>
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Transparent background — icon is just the terminal -->
+
+  <!-- Terminal window body -->
+  <rect x="24" y="48" width="464" height="416" rx="32" fill="#111111"/>
+
+  <!-- Title bar -->
+  <rect x="24" y="48" width="464" height="56" rx="32" fill="#252525"/>
+  <rect x="24" y="76" width="464" height="28" fill="#252525"/>
+  <!-- Traffic lights -->
+  <circle cx="64" cy="76" r="10" fill="#ef4444"/>
+  <circle cx="96" cy="76" r="10" fill="#f59e0b"/>
+  <circle cx="128" cy="76" r="10" fill="#4ade80"/>
+
+  <!-- Prompt line 1 -->
+  <text x="56" y="160" font-family="SF Mono, Menlo, monospace" font-size="32" font-weight="600" fill="#4ade80">$</text>
+  <rect x="88" y="140" width="180" height="28" rx="4" fill="#2a6df0" opacity="0.7"/>
+
+  <!-- Prompt line 2 -->
+  <text x="56" y="220" font-family="SF Mono, Menlo, monospace" font-size="32" font-weight="600" fill="#4ade80">$</text>
+  <rect x="88" y="200" width="120" height="28" rx="4" fill="#888888" opacity="0.4"/>
+
+  <!-- Cursor blink -->
+  <rect x="220" y="200" width="16" height="28" rx="2" fill="#2a6df0" opacity="0.9"/>
+
+  <!-- Output lines (subtle) -->
+  <rect x="56" y="260" width="280" height="16" rx="3" fill="#555" opacity="0.3"/>
+  <rect x="56" y="290" width="200" height="16" rx="3" fill="#555" opacity="0.25"/>
+  <rect x="56" y="320" width="320" height="16" rx="3" fill="#555" opacity="0.2"/>
+  <rect x="56" y="350" width="160" height="16" rx="3" fill="#555" opacity="0.15"/>
+
+  <!-- Bottom accent line -->
+  <rect x="24" y="456" width="464" height="8" rx="4" fill="#2a6df0" opacity="0.6"/>
+</svg>
