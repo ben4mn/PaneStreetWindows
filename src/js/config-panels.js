@@ -664,7 +664,7 @@ async function renderSettingsTab(tab) {
         </div>
         <div class="setting-row">
           <div class="setting-label">Platform</div>
-          <div class="setting-value">macOS</div>
+          <div class="setting-value">${navigator.platform.indexOf('Win') >= 0 ? 'Windows' : navigator.platform.indexOf('Mac') >= 0 ? 'macOS' : 'Linux'}</div>
         </div>
       </div>
 
@@ -686,10 +686,45 @@ async function renderSettingsTab(tab) {
         </div>
       </div>
 
-      <div style="margin-top:20px">
+      <div class="settings-group" style="margin-top:12px">
+        <div class="setting-section-title">What's New</div>
+        <div id="changelog-content" style="margin-top:8px">
+          <div class="setting-description" style="color:var(--text-muted)">Loading release notes...</div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px">
         <div class="setting-description">Pane Street — Multi-session Claude Code terminal manager</div>
       </div>
     `;
+
+    // Load changelog from GitHub releases
+    (async () => {
+      const el = container.querySelector('#changelog-content');
+      if (!el) return;
+      try {
+        const res = await fetch('https://api.github.com/repos/ben4mn/PaneStreetWindows/releases?per_page=5');
+        if (!res.ok) throw new Error('fetch failed');
+        const releases = await res.json();
+        if (!releases.length) { el.innerHTML = '<div class="setting-description" style="color:var(--text-muted)">No releases found.</div>'; return; }
+        el.innerHTML = releases.map(r => {
+          const date = new Date(r.published_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+          const safeTag = escapeForHtml(r.tag_name);
+          const safeDate = escapeForHtml(date);
+          const body = r.body ? formatChangelogBody(r.body) : '<span style="color:var(--text-muted)">No notes.</span>';
+          return `
+            <div class="changelog-entry">
+              <div class="changelog-header">
+                <span class="changelog-version">${safeTag}</span>
+                <span class="changelog-date">${safeDate}</span>
+              </div>
+              <div class="changelog-body">${body}</div>
+            </div>`;
+        }).join('');
+      } catch {
+        el.innerHTML = '<div class="setting-description" style="color:var(--text-muted)">Could not load release notes.</div>';
+      }
+    })();
 
     container.querySelector('#check-update-btn').addEventListener('click', async () => {
       const msgEl = container.querySelector('#update-status-msg');
@@ -1796,6 +1831,24 @@ function flashButton(btn) {
 
 function escapeForHtml(text) {
   return (text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function formatChangelogBody(md) {
+  return md
+    .split('\n')
+    .filter(l => l.trim())
+    .map(l => {
+      const t = l.trim();
+      if (/^#{1,3}\s/.test(t)) return ''; // skip sub-headers
+      if (/^[-*]\s/.test(t)) {
+        const safe = escapeForHtml(t.slice(2));
+        const text = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        return `<div class="changelog-item">\u2022 ${text}</div>`;
+      }
+      return `<div class="changelog-item" style="color:var(--text-muted)">${escapeForHtml(t)}</div>`;
+    })
+    .filter(Boolean)
+    .join('');
 }
 
 async function getHomePath() {

@@ -88,15 +88,19 @@ export function hideFileViewer() {
 
   // Slide out to right
   viewer.classList.add('closing');
-  const onEnd = () => {
+  let handled = false;
+  const hide = () => {
+    if (handled) return;
+    handled = true;
     viewer.removeEventListener('transitionend', onEnd);
-    if (!viewerVisible) {
-      viewer.style.display = 'none';
-    }
+    if (!viewerVisible) viewer.style.display = 'none';
+  };
+  const onEnd = (e) => {
+    if (e.target === viewer) hide();
   };
   viewer.addEventListener('transitionend', onEnd);
   // Fallback if transition doesn't fire
-  setTimeout(() => { if (!viewerVisible) viewer.style.display = 'none'; }, 300);
+  setTimeout(hide, 350);
 }
 
 export function updateFileViewerCwd(cwd) {

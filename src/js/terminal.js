@@ -153,24 +153,19 @@ export class TerminalSession {
       return true;
     });
 
-    // Observe container resize with debounce for smooth resizing
+    // Observe container resize with debounce to avoid layout thrashing
     this._fitTimer = null;
     this.resizeObserver = new ResizeObserver(() => {
-      // Immediate fit for responsiveness
-      this.fit();
-      // Debounced follow-up to catch layout settling
       clearTimeout(this._fitTimer);
-      this._fitTimer = setTimeout(() => this.fit(), 50);
+      this._fitTimer = setTimeout(() => this.fit(), 30);
     });
   }
 
   open() {
     this.term.open(this.container);
     this.resizeObserver.observe(this.container);
-    // Multiple fit passes: immediate, after layout, and after paint
-    this.fit();
+    // Fit after layout has settled
     requestAnimationFrame(() => this.fit());
-    setTimeout(() => this.fit(), 50);
 
     // Backup: capture Shift+Enter at container DOM level too
     this.container.addEventListener('keydown', (e) => {
@@ -271,8 +266,7 @@ export class TerminalSession {
 
     // On Windows, the WebGL renderer and ConPTY sometimes need a
     // re-fit after initial connection to render correctly.
-    setTimeout(() => this.fit(), 100);
-    setTimeout(() => this.fit(), 500);
+    setTimeout(() => this.fit(), 150);
 
     return this.sessionId;
   }

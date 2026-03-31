@@ -1124,6 +1124,12 @@ html, body {
   display: none;
 }
 
+/* Pause all mascot animations when app is hidden to save CPU/GPU */
+.app-hidden #footer-mascot,
+.app-hidden #footer-mascot * {
+  animation-play-state: paused !important;
+}
+
 #footer-mascot {
   pointer-events: auto;
   position: absolute;
@@ -1185,6 +1191,14 @@ html, body {
 }
 #footer-mascot.walking .robot-shadow {
   animation: walk-shadow 0.5s ease-in-out infinite;
+}
+#footer-mascot.walking .robot-antenna {
+  animation: walk-antenna-bounce 0.25s ease-in-out infinite alternate;
+  transform-origin: 14px 5px;
+}
+@keyframes walk-antenna-bounce {
+  0% { transform: rotate(-6deg); }
+  100% { transform: rotate(6deg); }
 }
 
 /* Body: gentle up-down bob, twice per cycle (once per step) */
@@ -1622,22 +1636,60 @@ html, body {
 }
 #footer-mascot.exited * { animation: none !important; }
 
+/* Drag and fall */
+#footer-mascot.dragging {
+  cursor: grabbing;
+  transform: scale(1.08);
+  transition: transform 0.15s ease !important;
+}
+#footer-mascot.act-falling .robot-arm-l {
+  animation: falling-arm-l 0.45s ease-in-out infinite alternate;
+  transform-origin: 6.5px 21px;
+}
+#footer-mascot.act-falling .robot-arm-r {
+  animation: falling-arm-r 0.45s ease-in-out infinite alternate;
+  transform-origin: 21.5px 21px;
+}
+#footer-mascot.act-falling .robot-antenna {
+  animation: falling-antenna 0.4s ease-in-out infinite alternate;
+  transform-origin: 14px 5px;
+}
+#footer-mascot.act-falling .robot-body {
+  animation: falling-wobble 0.5s ease-in-out infinite alternate;
+}
+@keyframes falling-arm-l {
+  0% { transform: rotate(-10deg); }
+  100% { transform: rotate(8deg); }
+}
+@keyframes falling-arm-r {
+  0% { transform: rotate(10deg); }
+  100% { transform: rotate(-8deg); }
+}
+@keyframes falling-antenna {
+  0% { transform: rotate(-8deg); }
+  100% { transform: rotate(8deg); }
+}
+@keyframes falling-wobble {
+  0% { transform: rotate(-2deg); }
+  100% { transform: rotate(2deg); }
+}
+
 /* Speech bubble */
 .mascot-speech {
   position: absolute;
-  bottom: 60px;
+  bottom: 72px;
   left: 50%;
   transform: translateX(-50%);
   background: var(--bg-card);
   color: var(--text-primary);
-  font-size: 10px;
+  font-size: 13px;
+  line-height: 1.4;
   font-family: var(--font-ui);
-  padding: 4px 10px;
+  padding: 6px 12px;
   border-radius: 6px;
-  white-space: nowrap;
-  max-width: 240px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-wrap: break-word;
+  max-width: 360px;
   opacity: 0;
   transition: opacity 0.3s;
   pointer-events: none;
@@ -3751,4 +3803,32 @@ html, body {
 /* Hide metadata in collapsed sidebar */
 #sidebar.collapsed .session-meta-row {
   display: none;
+}
+
+/* Changelog */
+.changelog-entry {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.06));
+}
+.changelog-entry:last-child { border-bottom: none; }
+.changelog-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.changelog-version {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--accent);
+}
+.changelog-date {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+.changelog-body { display: flex; flex-direction: column; gap: 3px; }
+.changelog-item {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  line-height: 1.5;
 }

@@ -21,6 +21,8 @@ function shortenCwd(cwd) {
 }
 
 const sessions = [];
+const closedSessionStack = []; // For Ctrl+Z undo-close
+const MAX_CLOSED_SESSIONS = 10;
 let focusedIndex = 0;
 let maximizedIndex = null;
 let contextMenu = null;
@@ -30,6 +32,21 @@ let freeformZCounter = 1;
 const SNAP_INCREMENT = 20;
 const PANE_MIN_WIDTH = 200;
 const PANE_MIN_HEIGHT = 120;
+
+// --- Throttle / Debounce utilities ---
+function throttle(fn, ms) {
+  let last = 0, timer = null;
+  return function(...args) {
+    const now = Date.now();
+    clearTimeout(timer);
+    if (now - last >= ms) {
+      last = now;
+      fn.apply(this, args);
+    } else {
+      timer = setTimeout(() => { last = Date.now(); fn.apply(this, args); }, ms - (now - last));
+    }
+  };
+}
 
 // Grid split ratios — stored as percentages for columns and rows
 // Reset when pane count changes; keyed by layout count
@@ -65,6 +82,7 @@ window.addEventListener('focus', () => setFocused(true));
 window.addEventListener('blur', () => setFocused(false));
 document.addEventListener('visibilitychange', () => {
   setFocused(!document.hidden);
+  document.body.classList.toggle('app-hidden', document.hidden);
 });
 // Tauri native window focus events (most reliable for OS-level app switching)
 listen('tauri://focus', () => setFocused(true));
@@ -766,13 +784,13 @@ function setupFreeformResize() {
   });
 }
 
-function fitVisibleTerminals() {
+const fitVisibleTerminals = throttle(function() {
   if (maximizedIndex !== null && maximizedIndex < sessions.length) {
     sessions[maximizedIndex].terminal.fit();
   } else {
     sessions.filter(s => !s.minimized).forEach(s => s.terminal.fit());
   }
-}
+}, 50);
 
 // --- Focus ---
 
@@ -1068,6 +1086,21 @@ async function removeSession(index) {
     maximizedIndex--;
   }
 
+  // Save session info for undo-close (Ctrl+Shift+Z)
+  try {
+    const scrollback = session.terminal.getScrollback(500);
+    const cleanBuffer = (session.terminal._outputBuffer || '').replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+    const wasClaude = cleanBuffer.includes('Claude Code') || cleanBuffer.includes('Total cost:') || cleanBuffer.includes('claude-opus') || cleanBuffer.includes('claude-sonnet');
+    closedSessionStack.push({
+      name: session.name,
+      cwd: session.cwd,
+      scrollback,
+      wasClaude,
+      closedAt: Date.now(),
+    });
+    if (closedSessionStack.length > MAX_CLOSED_SESSIONS) closedSessionStack.shift();
+  } catch {}
+
   await session.terminal.destroy();
   if (session.pane.parentNode) session.pane.remove();
   sessions.splice(index, 1);
@@ -1092,6 +1125,31 @@ async function removeSession(index) {
       }
     }
     requestAnimationFrame(() => setFocus(target));
+  }
+}
+
+async function reopenLastClosed() {
+  if (closedSessionStack.length === 0) return;
+  const closed = closedSessionStack.pop();
+  await createSession(closed.cwd, closed.scrollback);
+  // Rename the new session to the old name
+  const newSession = sessions[sessions.length - 1];
+  if (newSession && closed.name) {
+    newSession.name = closed.name;
+    newSession.pane.querySelector('.pane-title').textContent = closed.name;
+    rebuildSidebar();
+    updateFooterPills();
+  }
+  setFocus(sessions.length - 1);
+  // Auto-resume Claude Code session (--resume picks up the most recent conversation)
+  if (closed.wasClaude && newSession) {
+    setTimeout(() => {
+      const encoder = new TextEncoder();
+      invoke('write_to_pty', {
+        sessionId: newSession.id,
+        data: Array.from(encoder.encode('claude --resume\n')),
+      });
+    }, 500);
   }
 }
 
@@ -1422,31 +1480,53 @@ function updateSidebarMeta() {
       cwdEl.style.display = 'none';
     }
 
-    // Update ports
+    // Update ports (skip DOM work if unchanged)
     const portsEl = card.querySelector('.session-ports');
     if (portsEl) {
       const ports = s._ports || [];
+      const portsKey = ports.join(',');
       if (ports.length > 0) {
-        portsEl.innerHTML = ports.map(p => `<span class="session-port-badge">:${p}</span>`).join(' ');
+        if (portsEl.dataset.ports !== portsKey) {
+          portsEl.dataset.ports = portsKey;
+          portsEl.textContent = '';
+          ports.forEach(p => {
+            const badge = document.createElement('span');
+            badge.className = 'session-port-badge';
+            badge.textContent = ':' + p;
+            portsEl.appendChild(badge);
+          });
+        }
         portsEl.style.display = '';
       } else {
+        if (portsEl.dataset.ports) {
+          portsEl.dataset.ports = '';
+          portsEl.textContent = '';
+        }
         portsEl.style.display = 'none';
       }
     }
 
-    // Update PR status
+    // Update PR status (skip DOM work if unchanged)
     const prEl = card.querySelector('.session-pr');
     if (prEl) {
       const pr = s._pr;
-      if (pr) {
-        const state = pr.state || '';
-        const num = pr.number || '';
-        const cls = state === 'MERGED' ? 'pr-merged' : state === 'CLOSED' ? 'pr-closed' : '';
-        prEl.innerHTML = `<span class="session-pr-badge ${cls}">#${num} ${state.toLowerCase()}</span>`;
-        prEl.style.display = '';
-      } else {
-        prEl.style.display = 'none';
+      const prKey = pr ? `${pr.number}-${pr.state}` : '';
+      if (prEl.dataset.prKey !== prKey) {
+        prEl.dataset.prKey = prKey;
+        if (pr) {
+          const state = pr.state || '';
+          const num = pr.number || '';
+          const cls = state === 'MERGED' ? 'pr-merged' : state === 'CLOSED' ? 'pr-closed' : '';
+          prEl.textContent = '';
+          const badge = document.createElement('span');
+          badge.className = 'session-pr-badge ' + cls;
+          badge.textContent = '#' + num + ' ' + state.toLowerCase();
+          prEl.appendChild(badge);
+        } else {
+          prEl.textContent = '';
+        }
       }
+      prEl.style.display = pr ? '' : 'none';
     }
   });
 }
@@ -1535,59 +1615,66 @@ function promptRename(index) {
 
 // --- Git Info ---
 
+let _gitInfoRunning = false;
 async function updateGitInfo() {
-  const el = document.getElementById('footer-git');
-  if (sessions.length === 0 || focusedIndex >= sessions.length) {
-    el.textContent = '';
-    el.dataset.branch = '';
-    return;
-  }
-
-  const session = sessions[focusedIndex];
-  const cwd = session.cwd;
-  if (!cwd) {
-    // No CWD tracked — can't detect git info
-    el.textContent = '';
-    el.dataset.branch = '';
-    return;
-  }
-
+  if (_gitInfoRunning) return;
+  _gitInfoRunning = true;
   try {
-    const showBranch = localStorage.getItem('ps-git-show-branch') !== 'false';
-    const showWorktree = localStorage.getItem('ps-git-show-worktree') !== 'false';
-
-    if (!showBranch) {
+    const el = document.getElementById('footer-git');
+    if (sessions.length === 0 || focusedIndex >= sessions.length) {
       el.textContent = '';
       el.dataset.branch = '';
       return;
     }
 
-    const summary = await invoke('get_git_info', { cwd });
-    if (!summary) {
+    const session = sessions[focusedIndex];
+    const cwd = session.cwd;
+    if (!cwd) {
+      // No CWD tracked — can't detect git info
       el.textContent = '';
       el.dataset.branch = '';
       return;
     }
 
-    let text = `git: ${summary.info.branch}`;
-    if (summary.info.is_worktree) {
-      text += ' (worktree)';
-    }
-    if (showWorktree && summary.active_worktree_count > 0) {
-      text += ` | worktrees: ${summary.active_worktree_count}`;
-    }
+    try {
+      const showBranch = localStorage.getItem('ps-git-show-branch') !== 'false';
+      const showWorktree = localStorage.getItem('ps-git-show-worktree') !== 'false';
 
-    el.textContent = text;
-    el.dataset.branch = summary.info.branch;
+      if (!showBranch) {
+        el.textContent = '';
+        el.dataset.branch = '';
+        return;
+      }
 
-    // Show chevron when git info is available
-    document.getElementById('footer-expand-toggle').style.display = '';
-  } catch {
-    el.textContent = '';
-    el.dataset.branch = '';
-    document.getElementById('footer-expand-toggle').style.display = 'none';
+      const summary = await invoke('get_git_info', { cwd });
+      if (!summary) {
+        el.textContent = '';
+        el.dataset.branch = '';
+        return;
+      }
+
+      let text = `git: ${summary.info.branch}`;
+      if (summary.info.is_worktree) {
+        text += ' (worktree)';
+      }
+      if (showWorktree && summary.active_worktree_count > 0) {
+        text += ` | worktrees: ${summary.active_worktree_count}`;
+      }
+
+      el.textContent = text;
+      el.dataset.branch = summary.info.branch;
+
+      // Show chevron when git info is available
+      document.getElementById('footer-expand-toggle').style.display = '';
+    } catch {
+      el.textContent = '';
+      el.dataset.branch = '';
+      document.getElementById('footer-expand-toggle').style.display = 'none';
+    }
+    updateFooterVisibility();
+  } finally {
+    _gitInfoRunning = false;
   }
-  updateFooterVisibility();
 }
 
 function setupGitInfoClick() {
@@ -1934,6 +2021,7 @@ function setupShortcuts() {
     'nav-down':       { key: 'ArrowDown',  meta: true,  shift: false, alt: true },
     'nav-left':       { key: 'ArrowLeft',  meta: true,  shift: false, alt: true },
     'nav-right':      { key: 'ArrowRight', meta: true,  shift: false, alt: true },
+    'reopen-closed':  { key: 'z',       meta: true,  shift: true  },
   };
 
   const ACTIONS = {
@@ -1950,6 +2038,7 @@ function setupShortcuts() {
     'prev-pane':      () => { if (isAnyPanelActive()) hidePanel(); focusNextVisible(focusedIndex, -1); return true; },
     'next-pane':      () => { if (isAnyPanelActive()) hidePanel(); focusNextVisible(focusedIndex, 1); return true; },
     'notifications':  () => { toggleNotificationPanel(); return true; },
+    'reopen-closed':  () => { reopenLastClosed(); return true; },
     'nav-up':         () => { navigateDirection('up'); return true; },
     'nav-down':       () => { navigateDirection('down'); return true; },
     'nav-left':       () => { navigateDirection('left'); return true; },
@@ -2038,12 +2127,13 @@ function renderNotificationPanel() {
     const statusLabel = n.status.startsWith('OSC:') ? n.status : {
       WaitingForInput: 'Needs attention',
       NeedsPermission: 'Needs approval',
+      ClaudeNeedsInput: 'Claude needs input',
       Exited: 'Finished',
       CommandCompleted: 'Command done',
       Error: 'Something went wrong',
       ClaudeFinished: 'Claude is done',
     }[n.status] || n.status;
-    const dotColorMap = { WaitingForInput: 'waiting', NeedsPermission: 'waiting', Exited: 'exited', Error: 'exited', ClaudeFinished: 'idle', CommandCompleted: 'idle' };
+    const dotColorMap = { WaitingForInput: 'waiting', NeedsPermission: 'waiting', ClaudeNeedsInput: 'waiting', Exited: 'exited', Error: 'exited', ClaudeFinished: 'idle', CommandCompleted: 'idle' };
     const dotColor = dotColorMap[statusClass] || 'working';
     return `<div class="notif-item" data-index="${n.sessionIndex}">
       <span class="notif-dot" style="background:var(--status-${dotColor})"></span>
@@ -2107,6 +2197,7 @@ const STATUS_COLORS = {
   Idle: 'var(--status-idle)',
   WaitingForInput: 'var(--status-waiting)',
   NeedsPermission: 'var(--status-permission)',
+  ClaudeNeedsInput: 'var(--status-waiting)',
   Error: 'var(--status-exited)',
   ClaudeFinished: 'var(--status-idle)',
   Exited: 'var(--status-exited)',
@@ -2125,6 +2216,7 @@ async function maybeNotify(session, status) {
       const friendlyStatus = {
         WaitingForInput: 'needs attention',
         NeedsPermission: 'needs approval',
+        ClaudeNeedsInput: 'needs your input',
         Error: 'has a problem',
         ClaudeFinished: 'Claude is done',
       }[status];
@@ -2138,6 +2230,7 @@ async function maybeNotify(session, status) {
   const statusToggleMap = {
     WaitingForInput: 'ps-notify-waiting',
     NeedsPermission: 'ps-notify-permission',
+    ClaudeNeedsInput: 'ps-notify-claude-input',
     Exited: 'ps-notify-exited',
     CommandCompleted: 'ps-notify-completed',
     Error: 'ps-notify-error',
@@ -2155,6 +2248,7 @@ async function maybeNotify(session, status) {
   const messages = {
     WaitingForInput: 'needs your attention',
     NeedsPermission: 'is asking for your approval',
+    ClaudeNeedsInput: 'Claude needs your input',
     Exited: 'has finished',
     CommandCompleted: 'finished running a command',
     Error: 'ran into a problem',
@@ -2224,7 +2318,7 @@ function setupStatusListener() {
     }
 
     // Notification ring on unfocused panes that need attention
-    const needsAttention = ['WaitingForInput', 'NeedsPermission', 'Exited', 'Error', 'ClaudeFinished'].includes(status);
+    const needsAttention = ['WaitingForInput', 'NeedsPermission', 'ClaudeNeedsInput', 'Exited', 'Error', 'ClaudeFinished'].includes(status);
     const commandCompleted = (previousStatus === 'Working' && status === 'Idle');
     const isFocused = idx === focusedIndex;
 
@@ -2357,30 +2451,32 @@ const APP_TIPS = [
   'Terminals emit OSC 9 for notifications',
 ];
 
-const SPEECH_WORKING = ['On it!', 'Working...', 'Processing...'];
-const SPEECH_WAITING = ['Need input!', 'Your turn!', 'Waiting...'];
-const SPEECH_DONE = ['Done!', 'All set!', 'Finished!'];
-const SPEECH_CLICK = ['Hey there.', 'What\'s up?', 'Need something?', 'Sup.', 'You rang?', 'At your service.', 'Hmm?', '*waves*', 'Present.', 'Yo.'];
+const SPEECH_WORKING = ['On it!', 'Working...', 'Give me a sec.', 'Processing...', 'Crunching...', 'On the case.'];
+const SPEECH_WAITING = ['Your move.', 'Over to you.', 'Whenever you\'re ready.', 'Your turn.', 'Need input!'];
+const SPEECH_DONE = ['Done.', 'There you go.', 'All set.', 'Finished.', 'Easy.', 'That\'s a wrap.'];
+const SPEECH_CLICK = ['Hey.', 'Oh, hi.', 'You need something?', 'I\'m here.', 'What\'s the word?', 'In the flesh. Mostly.', 'Ready when you are.', 'Mm?', 'Right here.', 'As you were.', 'Still here.', 'Yep?'];
 
 // Contextual quips based on terminal output patterns
 const CONTEXTUAL_QUIPS = [
-  { patterns: [/npm install|npm i |yarn add|pnpm add/i], quips: ['Installing packages...', 'Grabbing dependencies...', 'npm doing its thing...'] },
-  { patterns: [/npm run build|cargo build|vite build|webpack/i], quips: ['Building...', 'Compiling away...', 'Build in progress...'] },
-  { patterns: [/npm test|pytest|cargo test|vitest|jest/i], quips: ['Fingers crossed...', 'Running tests...', 'Testing testing...'] },
-  { patterns: [/git push/i], quips: ['Shipping it!', 'Off it goes!', 'Pushed!'] },
-  { patterns: [/git commit/i], quips: ['Good commit.', 'Saving progress...', 'Committed!'] },
-  { patterns: [/git merge|git rebase/i], quips: ['Merging...', 'Combining branches...'] },
-  { patterns: [/git pull|git fetch/i], quips: ['Pulling latest...', 'Syncing up...'] },
-  { patterns: [/docker compose|docker build/i], quips: ['Containers spinning up...', 'Docker time...'] },
-  { patterns: [/pip install|poetry add/i], quips: ['Python packages...', 'pip doing its thing...'] },
-  { patterns: [/Total cost:|Total tokens:/i], quips: ["I'd have asked Claude too.", 'Claude delivered.', 'Nice work, Claude.', 'That was fast.'] },
-  { patterns: [/error\[|Error:|SyntaxError|TypeError|panic:/i], quips: ['Oof.', "That doesn't look right...", 'Hmm...'] },
-  { patterns: [/✓ built|Successfully compiled|Build succeeded/i], quips: ['Clean build!', 'Ship it!', 'Looking good.'] },
-  { patterns: [/Downloading|downloading/], quips: ['Downloading...', 'Fetching stuff...'] },
-  { patterns: [/deploy|Deploy|DEPLOY/], quips: ['Deploying!', 'Going live...', 'Launch sequence!'] },
-  { patterns: [/lint|eslint|prettier/i], quips: ['Linting...', 'Keeping it clean...'] },
-  { patterns: [/migration|migrate/i], quips: ['Migrating...', 'Schema changes...'] },
-  { patterns: [/claude |Claude /], quips: ['Claude is thinking...', 'Let Claude cook...', 'AI at work...'] },
+  { patterns: [/npm install|npm i |yarn add|pnpm add/i], quips: ['Package time.', 'Dependencies inbound.', 'npm doing its thing.', 'Grabbing packages...'] },
+  { patterns: [/npm run build|cargo build|vite build|webpack/i], quips: ['Building...', 'Compiling.', 'Build in progress.', 'Fingers crossed.'] },
+  { patterns: [/npm test|pytest|cargo test|vitest|jest/i], quips: ['Running tests...', 'Here we go.', 'Let\'s see how this goes.', 'Tests incoming.'] },
+  { patterns: [/git push/i], quips: ['Sending it.', 'Up she goes.', 'Shipped.', 'Off it goes.'] },
+  { patterns: [/git commit/i], quips: ['Committing to the bit.', 'History is being made.', 'Saved.', 'Good commit.'] },
+  { patterns: [/git merge|git rebase/i], quips: ['Merging...', 'Here we go.', 'May the conflicts be few.'] },
+  { patterns: [/git pull|git fetch/i], quips: ['Pulling latest.', 'Syncing up.', 'What\'d I miss?'] },
+  { patterns: [/docker compose|docker build|docker run/i], quips: ['Containers, containers everywhere.', 'Docker time.', 'Spinning up...'] },
+  { patterns: [/pip install|poetry add/i], quips: ['Python packages incoming.', 'pip doing its thing.'] },
+  { patterns: [/Total cost:|Total tokens:/i], quips: ["I'd have asked Claude too.", 'Claude delivered.', 'Nice work, Claude.', 'Tokens well spent.'] },
+  { patterns: [/error\[|Error:|SyntaxError|TypeError|panic:/i], quips: ['Oof.', 'That\'s not ideal.', 'We\'ve seen worse.', 'Hmm.'] },
+  { patterns: [/✓ built|Successfully compiled|Build succeeded|Tests passed/i], quips: ['Green across the board.', 'Clean build.', 'Ship it.', 'Looking good.'] },
+  { patterns: [/Downloading|downloading/], quips: ['Downloading...', 'Fetching...'] },
+  { patterns: [/deploy|Deploy|DEPLOY/], quips: ['Going live.', 'Launch sequence.', 'Deploying...'] },
+  { patterns: [/lint|eslint|prettier/i], quips: ['Keeping it clean.', 'Linting...'] },
+  { patterns: [/migration|migrate/i], quips: ['Schema changes incoming.', 'Migrating...'] },
+  { patterns: [/claude |Claude /], quips: ['Let Claude cook.', 'AI at work.', 'Claude\'s on it.'] },
+  { patterns: [/warning|Warning/], quips: ['Heads up.', 'Worth a look.', 'A warning or two.'] },
+  { patterns: [/fatal|FATAL|killed|Killed/i], quips: ['Yikes.', 'That\'s not great.', 'F.'] },
 ];
 
 // Animation frequency settings: [idlePauseMin, idlePauseMax, contextInterval, walkChance]
@@ -2397,6 +2493,16 @@ let robotOverride = null; // status override (working/waiting/exited)
 let lastActivityIndex = -1;
 let lastContextQuip = '';
 let contextScanTimer = null;
+
+// Boredom tracking
+let robotLastInteraction = Date.now();
+function touchInteraction() { robotLastInteraction = Date.now(); }
+function idleMs() { return Date.now() - robotLastInteraction; }
+const BOREDOM_IDLE_QUIPS = ['Still here.', 'Just vibing.', '...', 'Hello?', 'Anybody home?', 'Waiting patiently.'];
+const BOREDOM_WALK_QUIPS = ['Right. Going for a walk.', 'Stretching my legs.', 'Be right back.'];
+
+// Theme reaction cooldown
+let themeReactionCooldown = 0;
 
 function getFrequency() {
   return FREQUENCY_SETTINGS[localStorage.getItem('ps-robot-frequency') || 'medium'];
@@ -2425,12 +2531,135 @@ function robotInit() {
   let clickCount = 0;
   let clickResetTimer = null;
 
+  // --- Hold-to-secret ---
+  const SECRET_REACTIONS = [
+    () => { robotEl.classList.add('act-dance'); showSpeech('You found me.', 4000); robotTimer = setTimeout(() => { robotClearActivity(); robotNext(); }, 5000); },
+    () => { robotEl.classList.add('act-wave'); showSpeech('This is between us.', 4000); robotTimer = setTimeout(() => { robotClearActivity(); robotNext(); }, 4000); },
+    () => { robotEl.classList.add('act-bounce'); showSpeech("I wasn't expecting that.", 4000); robotTimer = setTimeout(() => { robotClearActivity(); robotNext(); }, 4000); },
+    () => { robotEl.classList.add('act-think'); showSpeech("Nobody's ever held on that long before.", 5000); robotTimer = setTimeout(() => { robotClearActivity(); robotNext(); }, 6000); },
+    () => { robotEl.classList.add('act-sleep'); showSpeech('Zzz...', 1200); robotTimer = setTimeout(() => { robotClearActivity(); showSpeech("I wasn't sleeping.", 3000); robotNext(); }, 2200); },
+    () => { robotEl.classList.add('act-stretch'); showSpeech('Okay fine, you caught me.', 4000); robotTimer = setTimeout(() => { robotClearActivity(); robotNext(); }, 5000); },
+  ];
+  let lastSecretIndex = -1;
+  function triggerSecretReaction() {
+    clearTimeout(robotTimer);
+    robotClearActivity();
+    let idx;
+    do { idx = Math.floor(Math.random() * SECRET_REACTIONS.length); } while (idx === lastSecretIndex && SECRET_REACTIONS.length > 1);
+    lastSecretIndex = idx;
+    SECRET_REACTIONS[idx]();
+  }
+
+  // --- Drag handling (pick up above line, drop back down) ---
+  let isDragging = false;
+  let hasDragged = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let dragStartLeft = 0;
+  let holdTimer = null;
+  let secretFired = false;
+
+  overlay?.addEventListener('mousedown', (e) => {
+    const rect = robotEl.getBoundingClientRect();
+    const dx = e.clientX - (rect.left + rect.width / 2);
+    const dy = e.clientY - (rect.top + rect.height / 2);
+    if (Math.abs(dx) > 40 || Math.abs(dy) > 50) return;
+
+    isDragging = true;
+    hasDragged = false;
+    secretFired = false;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    dragStartLeft = parseInt(robotEl.style.left) || 0;
+
+    clearTimeout(robotTimer);
+    robotClearActivity();
+    robotEl.style.transition = 'none';
+    robotEl.style.bottom = '0px';
+    robotEl.classList.add('dragging');
+    e.preventDefault();
+
+    // Hold-to-secret: if held still for 2s without dragging, trigger a surprise
+    holdTimer = setTimeout(() => {
+      if (!hasDragged) {
+        secretFired = true;
+        isDragging = false;
+        robotEl.classList.remove('dragging');
+        triggerSecretReaction();
+      }
+    }, 2000);
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const deltaX = e.clientX - dragStartX;
+    const deltaY = dragStartY - e.clientY; // up = positive
+    if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) {
+      hasDragged = true;
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    }
+    const ow = overlay ? overlay.clientWidth : window.innerWidth;
+    const newLeft = Math.max(4, Math.min(ow - 72, dragStartLeft + deltaX));
+    robotEl.style.left = newLeft + 'px';
+    const liftY = Math.max(0, deltaY);
+    robotEl.style.bottom = liftY + 'px';
+  });
+
+  const DROP_QUOTES = [
+    'AAAAAH!', 'Not again!', 'I can fly! ...nope.', 'Mayday!',
+    'Wheeeee!', 'Put me down!', 'I regret everything!', 'Gravity wins again.',
+    'My antenna!', 'Told you I\'d land it.', 'Stuck the landing!', '10/10 landing.',
+    'That was fun!', 'Do NOT do that again.', 'I think I left my stomach up there.',
+  ];
+
+  document.addEventListener('mouseup', () => {
+    if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    if (!isDragging) return;
+    isDragging = false;
+    robotEl.classList.remove('dragging');
+    touchInteraction();
+    const currentBottom = parseInt(robotEl.style.bottom) || 0;
+    if (currentBottom > 20) {
+      // Falling! Wave arms and speak
+      robotEl.classList.add('act-falling');
+      const fallDuration = Math.min(2.2, 0.9 + currentBottom * 0.006);
+      robotEl.style.transition = `bottom ${fallDuration}s cubic-bezier(0.33, 0, 0.66, 1)`;
+      robotEl.style.bottom = '0px';
+      showSpeech(DROP_QUOTES[Math.floor(Math.random() * DROP_QUOTES.length)], 2500);
+      setTimeout(() => {
+        robotEl.style.transition = '';
+        robotEl.classList.remove('act-falling');
+        robotEl.classList.add('act-bounce');
+        setTimeout(() => { robotEl.classList.remove('act-bounce'); if (!robotOverride) robotNext(); }, 600);
+      }, fallDuration * 1000);
+    } else if (currentBottom > 0) {
+      robotEl.style.transition = 'bottom 0.3s ease-out';
+      robotEl.style.bottom = '0px';
+      setTimeout(() => { robotEl.style.transition = ''; }, 350);
+      if (hasDragged) {
+        showSpeech(['New spot, nice.', 'I like it here.', 'Cozy.', 'Good enough.'][Math.floor(Math.random() * 4)], 2000);
+        setTimeout(() => { if (!robotOverride) robotNext(); }, 2000);
+      } else {
+        if (!robotOverride) robotNext();
+      }
+    } else {
+      if (hasDragged) {
+        showSpeech(['New spot, nice.', 'I like it here.', 'Fine by me.', 'This works.'][Math.floor(Math.random() * 4)], 2000);
+        setTimeout(() => { if (!robotOverride) robotNext(); }, 2000);
+      } else {
+        if (!robotOverride) robotNext();
+      }
+    }
+  });
+
   overlay?.addEventListener('click', (e) => {
     const rect = robotEl.getBoundingClientRect();
     const dx = e.clientX - (rect.left + rect.width / 2);
     const dy = e.clientY - (rect.top + rect.height / 2);
     if (Math.abs(dx) > 40 || Math.abs(dy) > 50) return;
 
+    if (hasDragged || secretFired) { hasDragged = false; secretFired = false; return; }
+    touchInteraction();
     clickCount++;
     clearTimeout(clickResetTimer);
     clickResetTimer = setTimeout(() => { clickCount = 0; }, 1500);
@@ -2498,6 +2727,55 @@ function robotInit() {
         robotNext();
       }, duration * 1000);
     }
+  });
+
+  // --- Environment Detection ---
+
+  // Online / offline
+  window.addEventListener('offline', () => {
+    if (robotEl && localStorage.getItem('ps-robot-enabled') !== 'false') showSpeech('We lost the connection.', 4000);
+  });
+  window.addEventListener('online', () => {
+    if (robotEl && localStorage.getItem('ps-robot-enabled') !== 'false') showSpeech('Back online.', 3000);
+  });
+
+  // Window focus / blur — comment on long absences
+  let blurTime = null;
+  window.addEventListener('blur', () => { blurTime = Date.now(); });
+  window.addEventListener('focus', () => {
+    if (!blurTime) return;
+    const away = Date.now() - blurTime;
+    blurTime = null;
+    touchInteraction(); // reset boredom clock when user returns
+    if (away > 5 * 60 * 1000 && robotEl && localStorage.getItem('ps-robot-enabled') !== 'false') {
+      const msgs = ['Welcome back.', 'Oh, you\'re back.', 'Miss me?', 'There you are.', 'I waited.'];
+      setTimeout(() => showSpeech(msgs[Math.floor(Math.random() * msgs.length)], 3500), 600);
+    }
+  });
+
+  // Battery (where supported)
+  if ('getBattery' in navigator) {
+    navigator.getBattery().then(battery => {
+      let batteryAlertSent = false;
+      const checkBattery = () => {
+        if (!batteryAlertSent && battery.level < 0.2 && !battery.charging && robotEl && localStorage.getItem('ps-robot-enabled') !== 'false') {
+          batteryAlertSent = true;
+          showSpeech('Low battery. Save your work.', 5000);
+        }
+      };
+      checkBattery();
+      battery.addEventListener('levelchange', checkBattery);
+      battery.addEventListener('chargingchange', () => { if (battery.charging) batteryAlertSent = false; });
+    }).catch(() => {});
+  }
+
+  // Theme changes
+  window.addEventListener('theme-terminal-changed', () => {
+    if (!robotEl || localStorage.getItem('ps-robot-enabled') === 'false') return;
+    if (Date.now() - themeReactionCooldown < 30000) return;
+    themeReactionCooldown = Date.now();
+    const msgs = ['New look.', 'Nice theme.', 'Bold choice.', 'I like it.', 'Stylish.'];
+    setTimeout(() => showSpeech(msgs[Math.floor(Math.random() * msgs.length)], 3000), 500);
   });
 
   // Just stand still on startup — the idle hover animation handles the rest
@@ -2582,11 +2860,41 @@ function robotDoActivity() {
   if (robotOverride) return;
   robotClearActivity();
 
-  // Pick a random activity (avoid repeating the last one)
+  const idle = idleMs();
+  const boredLevel = idle > 12 * 60000 ? 3 : idle > 8 * 60000 ? 2 : idle > 3 * 60000 ? 1 : 0;
+
+  // Boredom level 3 (12+ min idle): force sleep
+  if (boredLevel >= 3) {
+    const sleepAct = ACTIVITIES.find(a => a.name === 'sleep');
+    robotEl.classList.add(sleepAct.cls);
+    showSpeech('Zzz...', 5000);
+    const dur = sleepAct.duration[0] + Math.random() * (sleepAct.duration[1] - sleepAct.duration[0]);
+    robotTimer = setTimeout(() => {
+      robotClearActivity();
+      robotNext();
+    }, dur * 1000);
+    return;
+  }
+
+  // Boredom level 2 (8+ min idle): 40% chance to wander with quip
+  if (boredLevel >= 2 && Math.random() < 0.4) {
+    showSpeech(BOREDOM_WALK_QUIPS[Math.floor(Math.random() * BOREDOM_WALK_QUIPS.length)], 2500);
+    setTimeout(() => robotWalk(), 500);
+    return;
+  }
+
+  // Pick activity — bias toward boring ones when idle
   let idx;
-  do {
-    idx = Math.floor(Math.random() * ACTIVITIES.length);
-  } while (idx === lastActivityIndex && ACTIVITIES.length > 1);
+  const boringNames = ['stand', 'look', 'nod', 'think'];
+  if (boredLevel >= 1 && Math.random() < 0.65) {
+    const boringActs = ACTIVITIES.filter(a => boringNames.includes(a.name));
+    const candidate = boringActs[Math.floor(Math.random() * boringActs.length)];
+    idx = ACTIVITIES.indexOf(candidate);
+  } else {
+    do {
+      idx = Math.floor(Math.random() * ACTIVITIES.length);
+    } while (idx === lastActivityIndex && ACTIVITIES.length > 1);
+  }
   lastActivityIndex = idx;
 
   const act = ACTIVITIES[idx];
@@ -2599,8 +2907,15 @@ function robotDoActivity() {
     showSpeech('Zzz...');
   }
 
-  // Stay in this activity for its duration, then move on
+  // Occasional boredom quip while doing a boring activity
   const dur = act.duration[0] + Math.random() * (act.duration[1] - act.duration[0]);
+  if (boredLevel >= 1 && boringNames.includes(act.name) && Math.random() < 0.3) {
+    setTimeout(() => {
+      if (!robotOverride) showSpeech(BOREDOM_IDLE_QUIPS[Math.floor(Math.random() * BOREDOM_IDLE_QUIPS.length)], 3000);
+    }, (dur * 0.5) * 1000);
+  }
+
+  // Stay in this activity for its duration, then move on
   robotTimer = setTimeout(() => {
     robotClearActivity();
     // 50/50: walk somewhere or do another activity
@@ -2610,7 +2925,7 @@ function robotDoActivity() {
 
 function robotClearActivity() {
   if (!robotEl) return;
-  robotEl.classList.remove('walking', 'face-left', 'walk-anticipate', 'walk-arrive');
+  robotEl.classList.remove('walking', 'face-left', 'walk-anticipate', 'walk-arrive', 'dragging', 'act-falling');
   for (const act of ACTIVITIES) {
     robotEl.classList.remove(act.cls);
   }
@@ -2681,7 +2996,7 @@ function updateMascot(status, silent = false) {
     robotClearActivity();
     robotEl.classList.add('working');
     if (!silent) showSpeech(SPEECH_WORKING[Math.floor(Math.random() * SPEECH_WORKING.length)]);
-  } else if (status === 'WaitingForInput' || status === 'NeedsPermission') {
+  } else if (status === 'WaitingForInput' || status === 'NeedsPermission' || status === 'ClaudeNeedsInput') {
     robotOverride = 'waiting';
     clearTimeout(robotTimer);
     robotClearActivity();
@@ -2711,7 +3026,20 @@ function showSpeech(text, duration = 3000) {
   const el = document.getElementById('mascot-speech');
   if (!el) return;
   el.textContent = text;
+  el.style.left = '50%';
+  el.style.transform = 'translateX(-50%)';
   el.classList.add('visible');
+
+  // Auto-reposition if clipped at viewport edges
+  requestAnimationFrame(() => {
+    const rect = el.getBoundingClientRect();
+    if (rect.left < 8) {
+      el.style.left = `calc(50% + ${8 - rect.left}px)`;
+    } else if (rect.right > window.innerWidth - 8) {
+      el.style.left = `calc(50% - ${rect.right - window.innerWidth + 8}px)`;
+    }
+  });
+
   setTimeout(() => el.classList.remove('visible'), duration);
 }
 
@@ -2750,6 +3078,25 @@ function startTipTimer() {
 async function showWelcomeMessage() {
   if (localStorage.getItem('ps-robot-enabled') === 'false') return;
 
+  // Time and day awareness
+  const hour = new Date().getHours();
+  const day = new Date().getDay();
+  let timeGreeting = null;
+  if (hour >= 0 && hour < 5) {
+    timeGreeting = ['Working this late? Respect.', 'Night owl mode.', 'Still at it.'][Math.floor(Math.random() * 3)];
+  } else if (hour < 9) {
+    timeGreeting = ['Good morning.', 'Early start.', 'Rise and code.'][Math.floor(Math.random() * 3)];
+  } else if (hour >= 20) {
+    timeGreeting = ['Burning the midnight oil.', 'Late session.', 'Still going.'][Math.floor(Math.random() * 3)];
+  } else if (hour >= 17) {
+    timeGreeting = ['Evening shift.', 'Almost done for the day.'][Math.floor(Math.random() * 2)];
+  }
+
+  let dayGreeting = null;
+  if (day === 1) dayGreeting = 'Monday. Let\'s get it.';
+  else if (day === 5) dayGreeting = 'Friday. Finish strong.';
+  else if (day === 0 || day === 6) dayGreeting = 'Weekend dev? Dedication.';
+
   // Get the focused session's CWD for project context
   const session = sessions[focusedIndex];
   const cwd = session?.cwd;
@@ -2771,13 +3118,17 @@ async function showWelcomeMessage() {
     } catch {}
   }
 
-  // Build the welcome message
-  if (hint) {
+  // Build the welcome message — time/day greetings take priority
+  if (timeGreeting) {
+    showSpeech(timeGreeting, 4000);
+  } else if (dayGreeting) {
+    showSpeech(dayGreeting, 4000);
+  } else if (hint) {
     showSpeech(hint, 6000);
   } else if (projectName && projectName !== '~') {
-    showSpeech(`Welcome back to ${projectName}!`, 4000);
+    showSpeech(`Welcome back to ${projectName}.`, 4000);
   } else {
-    const greetings = ['Ready to code!', 'Let\'s build something.', 'Standing by.', 'At your service.'];
+    const greetings = ['Ready to code.', 'Let\'s build something.', 'Standing by.', 'At your service.'];
     showSpeech(greetings[Math.floor(Math.random() * greetings.length)], 4000);
   }
 }
@@ -2925,12 +3276,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         s.pane.style.height = r.height + 'px';
       });
     }
-    // Always refit all visible terminals regardless of mode
+    // Refit all visible terminals — throttle coalesces rapid resize events
     fitVisibleTerminals();
-    requestAnimationFrame(() => fitVisibleTerminals());
-    // Follow-up after layout settles (Windows WebView2 can be slow to report final size)
-    setTimeout(() => fitVisibleTerminals(), 100);
-    setTimeout(() => fitVisibleTerminals(), 300);
   });
 
   // When file viewer opens, push fresh CWD immediately
@@ -3103,6 +3450,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setTimeout(() => checkForUpdateOnStartup(), 3000);
 
   setInterval(() => {
+    if (!windowFocused) return;
     updateGitInfo();
     if (isFileViewerVisible()) {
       const session = sessions[focusedIndex];
@@ -3112,6 +3460,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Poll CWD for the focused session
   setInterval(async () => {
+    if (!windowFocused) return;
     if (sessions.length === 0) return;
     const session = sessions[focusedIndex];
     if (!session?.id) return;
@@ -3131,6 +3480,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Poll listening ports for all sessions (less frequent)
   setInterval(async () => {
+    if (!windowFocused) return;
     for (const session of sessions) {
       if (!session?.id) continue;
       try {
@@ -3145,6 +3495,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Poll PR status for focused session (infrequent, uses gh CLI)
   setInterval(async () => {
+    if (!windowFocused) return;
     const session = sessions[focusedIndex];
     if (!session?.cwd) return;
     try {

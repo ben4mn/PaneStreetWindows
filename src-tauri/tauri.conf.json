@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/nickel-org/nickel/refs/heads/master/schema/tauri-conf.json",
   "productName": "PaneStreet",
-  "version": "0.4.8",
+  "version": "0.5.0",
   "identifier": "com.panestreet.app",
   "build": {
     "frontendDist": "../src"
@@ -42,7 +42,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI5RTVCMEYzQ0M0MTk4QTAKUldTZ21FSE04N0RsdWRsM0o4clV0SXBGV3FhQzVHeWJaeFhSdHFiUnJHb2YyWk9hZ1lobzhWQjcK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDExMkY0RkNDRTMxM0EyNjQKUldSa29oUGp6RTh2RWVVRXhVelRBc09Jbk9qeGNGQjFkNE15S3JTaXptV083bFlLZE0xSlJHeXUK",
       "endpoints": [
         "https://github.com/ben4mn/PaneStreetWindows/releases/latest/download/latest.json"
       ]
@@ -50,7 +50,7 @@
   },
   "bundle": {
     "active": true,
-    "createUpdaterArtifacts": false,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",

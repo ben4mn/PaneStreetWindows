@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PaneStreet — Modern Terminal Multiplexer for macOS, Windows & Linux</title>
-  <meta name="description" content="PaneStreet is a GPU-accelerated terminal multiplexer built with Tauri and Rust. Multi-pane layouts, 16 themes, file browser, Claude AI integration. Free and open source.">
-  <meta name="keywords" content="terminal multiplexer, terminal emulator, tmux alternative, tauri app, rust terminal, xterm.js, multi-pane terminal, Claude AI, developer tools, macOS terminal">
-  <meta property="og:title" content="PaneStreet — Modern Terminal Multiplexer">
+  <title>PaneStreet for Windows — Modern Terminal Multiplexer</title>
+  <meta name="description" content="PaneStreet for Windows is a GPU-accelerated terminal multiplexer built with Tauri and Rust. Multi-pane layouts, 16 themes, file browser, Claude AI integration. Free and open source.">
+  <meta name="keywords" content="terminal multiplexer, terminal emulator, tmux alternative, tauri app, rust terminal, xterm.js, multi-pane terminal, Claude AI, developer tools, Windows terminal, PowerShell">
+  <meta property="og:title" content="PaneStreet for Windows — Modern Terminal Multiplexer">
   <meta property="og:description" content="GPU-accelerated terminal multiplexer with multi-pane layouts, 16 themes, and Claude AI integration. Built with Tauri and Rust.">
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://ben4mn.github.io/PaneStreet/">
-  <meta property="og:image" content="https://raw.githubusercontent.com/ben4mn/PaneStreet/main/docs/screenshots/hero.png">
+  <meta property="og:url" content="https://ben4mn.github.io/PaneStreetWindows/">
+  <meta property="og:image" content="https://raw.githubusercontent.com/ben4mn/PaneStreetWindows/main/docs/screenshots/hero.png">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/ben4mn/PaneStreet/main/icon.png">
+  <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/ben4mn/PaneStreetWindows/main/icon.png">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -30,7 +30,7 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
       background: var(--bg);
       color: var(--text);
       line-height: 1.6;
@@ -101,17 +101,26 @@
     }
     .btn-secondary:hover { border-color: #444; text-decoration: none; }
     .btn svg { width: 18px; height: 18px; }
+    .btn-outline {
+      background: transparent; color: var(--text-dim); border: 1px solid var(--border);
+      font-size: 0.9rem; padding: 8px 20px;
+    }
+    .btn-outline:hover { border-color: #444; color: var(--text-bright); text-decoration: none; }
 
     .hero-screenshot {
       margin-top: 4rem; max-width: 900px; width: 100%;
       border-radius: 12px; border: 1px solid var(--border);
       box-shadow: 0 20px 60px rgba(0,0,0,0.5);
     }
-    .hero-video {
-      margin-top: 4rem; max-width: 960px; width: 100%;
-      border-radius: 12px; border: 1px solid var(--border);
-      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+
+    /* Platform badge */
+    .platform-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(0, 120, 212, 0.12); border: 1px solid rgba(0, 120, 212, 0.3);
+      padding: 4px 14px; border-radius: 20px; font-size: 0.85rem;
+      color: #5ab0f0; margin-bottom: 1.5rem;
     }
+    .platform-badge svg { width: 16px; height: 16px; }
 
     /* Sections */
     section { padding: 6rem 2rem; max-width: 1100px; margin: 0 auto; }
@@ -200,7 +209,7 @@
     .shortcuts-table kbd {
       background: var(--bg-card); border: 1px solid var(--border);
       padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;
-      font-family: -apple-system, BlinkMacSystemFont, monospace;
+      font-family: 'Segoe UI', monospace;
     }
 
     /* Footer */
@@ -226,14 +235,15 @@
 
 <nav>
   <div class="nav-brand">
-    <img src="https://raw.githubusercontent.com/ben4mn/PaneStreet/main/icon.png" alt="PaneStreet icon">
-    PaneStreet
+    <img src="https://raw.githubusercontent.com/ben4mn/PaneStreetWindows/main/icon.png" alt="PaneStreet icon">
+    PaneStreet <span style="font-weight:400;color:var(--text-dim);font-size:0.85rem;margin-left:4px">for Windows</span>
   </div>
   <div class="nav-links">
     <a href="#features">Features</a>
     <a href="#screenshots">Screenshots</a>
     <a href="#install">Install</a>
-    <a href="https://github.com/ben4mn/PaneStreet" class="btn-sm">
+    <a href="https://ben4mn.github.io/PaneStreet/" style="color:var(--text-dim)">macOS Version</a>
+    <a href="https://github.com/ben4mn/PaneStreetWindows" class="btn-sm">
       <svg viewBox="0 0 16 16" fill="currentColor" style="width:16px;height:16px;vertical-align:middle;margin-right:4px"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
       GitHub
     </a>
@@ -242,23 +252,27 @@
 
 <!-- Hero -->
 <div class="hero">
-  <img src="https://raw.githubusercontent.com/ben4mn/PaneStreet/main/icon.png" alt="PaneStreet" class="hero-icon">
-  <h1>PaneStreet</h1>
-  <p class="tagline">A modern, GPU-accelerated terminal multiplexer with multi-pane layouts, 16 themes, and Claude AI integration. Built with Tauri and Rust.</p>
+  <img src="https://raw.githubusercontent.com/ben4mn/PaneStreetWindows/main/icon.png" alt="PaneStreet" class="hero-icon">
+  <div class="platform-badge">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+    Windows 10+
+  </div>
+  <h1>PaneStreet for Windows</h1>
+  <p class="tagline">A modern, GPU-accelerated terminal multiplexer with multi-pane layouts, 16 themes, and Claude AI integration. Native Windows app built with Tauri and Rust.</p>
   <div class="hero-buttons">
-    <a href="https://github.com/ben4mn/PaneStreet/releases/latest" class="btn btn-primary">
+    <a href="https://github.com/ben4mn/PaneStreetWindows/releases/latest" class="btn btn-primary">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Download for macOS
+      Download for Windows
     </a>
-    <a href="https://github.com/ben4mn/PaneStreet" class="btn btn-secondary">
+    <a href="https://github.com/ben4mn/PaneStreetWindows" class="btn btn-secondary">
       <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
       View on GitHub
     </a>
   </div>
-  <video class="hero-video" autoplay loop muted playsinline poster="screenshots/hero.png">
-    <source src="panestreet-demo.mp4" type="video/mp4">
-    <img src="screenshots/hero.png" alt="PaneStreet demo" class="hero-screenshot">
-  </video>
+  <div style="margin-top:1rem">
+    <a href="https://ben4mn.github.io/PaneStreet/" class="btn-outline btn" style="font-size:0.85rem;padding:6px 16px">Looking for the macOS version?</a>
+  </div>
+  <img src="screenshots/hero.png" alt="PaneStreet for Windows demo" class="hero-screenshot">
 </div>
 
 <!-- Features -->
@@ -290,22 +304,22 @@
     <div class="feature-card">
       <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
       <h3>Smart Notifications</h3>
-      <p>Friendly notification sidebar, pulsing glow rings, and an in-app mascot that relays alerts from other terminals. Plus native desktop alerts and OSC 9/99/777 support.</p>
+      <p>Notification sidebar, pulsing glow rings on unfocused panes, and a robot mascot that relays alerts. Native Windows desktop notifications with OSC 9/99/777 support.</p>
     </div>
     <div class="feature-card">
       <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4v2H8V6a4 4 0 0 1 4-4z"/><rect x="4" y="8" width="16" height="12" rx="2"/><circle cx="12" cy="15" r="2"/><line x1="12" y1="17" x2="12" y2="19"/></svg></div>
       <h3>Claude AI Integration</h3>
-      <p>View installed plugins, MCP servers, and project memory. Shift+Enter support for Claude Code. Socket API for external script control.</p>
+      <p>View installed plugins, MCP servers, and project memory. Shift+Enter support for Claude Code. Smart status detection for Claude prompts.</p>
     </div>
     <div class="feature-card">
       <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M8 14h8l1 8H7l1-8z"/></svg></div>
       <h3>Interactive Robot Mascot</h3>
-      <p>An animated companion that reacts to your terminal activity, relays notifications, and has a personality. Click it and find out.</p>
+      <p>An animated companion that reacts to your terminal activity, gets bored when you're away, relays notifications, and has easter eggs. Drag it around. Hold it. Click it.</p>
     </div>
     <div class="feature-card">
       <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/></svg></div>
-      <h3>Customizable Shortcuts</h3>
-      <p>Every shortcut is rebindable. Directional pane navigation with Cmd+Opt Arrows. Your muscle memory, your rules.</p>
+      <h3>PowerShell Native</h3>
+      <p>Auto-detects PowerShell 7 or Windows PowerShell. Every shortcut is rebindable. Ctrl+Alt Arrows for directional pane navigation.</p>
     </div>
   </div>
 </section>
@@ -362,32 +376,29 @@
 <!-- Install -->
 <section id="install">
   <h2 class="section-title">Get Started</h2>
-  <p class="section-subtitle">Download the app or build from source.</p>
+  <p class="section-subtitle">Download the installer or build from source.</p>
   <div class="install-grid">
     <div class="install-card">
-      <h3>Homebrew</h3>
-      <p>The fastest way to install on macOS.</p>
-      <code>brew tap ben4mn/panestreet
-brew install --cask panestreet</code>
-    </div>
-    <div class="install-card">
       <h3>Download</h3>
-      <p>Grab the latest release for macOS. Windows and Linux builds coming soon.</p>
-      <a href="https://github.com/ben4mn/PaneStreet/releases/latest" class="btn btn-primary" style="width:100%;justify-content:center">
+      <p>Grab the latest release for Windows 10+.</p>
+      <a href="https://github.com/ben4mn/PaneStreetWindows/releases/latest" class="btn btn-primary" style="width:100%;justify-content:center">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Download .dmg
+        Download .msi Installer
       </a>
       <div class="install-note">
-        <strong>macOS note:</strong> The app is not yet code-signed. Right-click the app and select <strong>Open</strong> on first launch, or go to System Settings &rarr; Privacy &amp; Security &rarr; Open Anyway.
+        <strong>Available formats:</strong> MSI installer (recommended) or NSIS .exe setup. Both are unsigned &mdash; Windows SmartScreen may prompt you on first launch.
       </div>
     </div>
     <div class="install-card">
       <h3>Build from Source</h3>
-      <p>Requires Node.js 18+, Rust, and the Tauri CLI.</p>
-      <code>git clone https://github.com/ben4mn/PaneStreet.git
-cd PaneStreet
+      <p>Requires Node.js 18+, Rust, and Visual Studio Build Tools (C++ workload).</p>
+      <code>git clone https://github.com/ben4mn/PaneStreetWindows.git
+cd PaneStreetWindows
 npm install
 npm run tauri build</code>
+      <div class="install-note">
+        Installers output to <code style="display:inline;padding:2px 6px">src-tauri/target/release/bundle/</code>
+      </div>
     </div>
   </div>
 </section>
@@ -399,27 +410,53 @@ npm run tauri build</code>
   <table class="shortcuts-table">
     <thead><tr><th>Action</th><th>Shortcut</th></tr></thead>
     <tbody>
-      <tr><td>New Terminal</td><td><kbd>&#8984; N</kbd></td></tr>
-      <tr><td>Close Terminal</td><td><kbd>&#8984; W</kbd></td></tr>
-      <tr><td>Settings</td><td><kbd>&#8984; ,</kbd></td></tr>
-      <tr><td>Toggle Sidebar</td><td><kbd>&#8984; B</kbd></td></tr>
-      <tr><td>File Browser</td><td><kbd>&#8679; &#8984; E</kbd></td></tr>
-      <tr><td>Maximize Pane</td><td><kbd>&#8679; &#8984; Enter</kbd></td></tr>
-      <tr><td>Toggle Layout Mode</td><td><kbd>&#8679; &#8984; G</kbd></td></tr>
-      <tr><td>Navigate Panes</td><td><kbd>&#8984; &#8997; Arrow</kbd></td></tr>
-      <tr><td>Notifications</td><td><kbd>&#8984; I</kbd></td></tr>
-      <tr><td>Switch to Pane 1-9</td><td><kbd>&#8984; 1</kbd> &ndash; <kbd>&#8984; 9</kbd></td></tr>
+      <tr><td>New Terminal</td><td><kbd>Ctrl N</kbd></td></tr>
+      <tr><td>Close Terminal</td><td><kbd>Ctrl W</kbd></td></tr>
+      <tr><td>Reopen Closed</td><td><kbd>Ctrl Shift Z</kbd></td></tr>
+      <tr><td>Settings</td><td><kbd>Ctrl ,</kbd></td></tr>
+      <tr><td>Toggle Sidebar</td><td><kbd>Ctrl B</kbd></td></tr>
+      <tr><td>File Browser</td><td><kbd>Ctrl Shift E</kbd></td></tr>
+      <tr><td>Maximize Pane</td><td><kbd>Ctrl Shift Enter</kbd></td></tr>
+      <tr><td>Toggle Layout Mode</td><td><kbd>Ctrl Shift G</kbd></td></tr>
+      <tr><td>Navigate Panes</td><td><kbd>Ctrl Alt Arrow</kbd></td></tr>
+      <tr><td>Notifications</td><td><kbd>Ctrl I</kbd></td></tr>
+      <tr><td>Switch to Pane 1-9</td><td><kbd>Ctrl 1</kbd> &ndash; <kbd>Ctrl 9</kbd></td></tr>
     </tbody>
   </table>
+</section>
+
+<!-- Windows Notes -->
+<section>
+  <h2 class="section-title">Windows-Specific</h2>
+  <p class="section-subtitle">Built for Windows from the ground up, not a port with rough edges.</p>
+  <div class="features-grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr))">
+    <div class="feature-card">
+      <h3>PowerShell Detection</h3>
+      <p>Automatically prefers PowerShell 7 (pwsh) over Windows PowerShell 5 over cmd.exe. Override with the <code style="background:#0d0d0d;padding:1px 6px;border-radius:4px;font-size:0.85rem">PS_SHELL</code> environment variable.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Shift+Enter</h3>
+      <p>Native ConPTY-aware implementation for newline insertion. Works seamlessly with Claude Code and other modern CLI tools.</p>
+    </div>
+    <div class="feature-card">
+      <h3>No Console Flash</h3>
+      <p>Background commands (git, netstat, gh) run with hidden windows so nothing flashes in the taskbar.</p>
+    </div>
+    <div class="feature-card">
+      <h3>Smart Notifications</h3>
+      <p>Throttled native desktop notifications (5s cooldown) to prevent Windows taskbar flash spam. Focus-debounced to handle toast notification refocus.</p>
+    </div>
+  </div>
 </section>
 
 <!-- Footer -->
 <footer>
   <div class="footer-links">
-    <a href="https://github.com/ben4mn/PaneStreet">GitHub</a>
-    <a href="https://github.com/ben4mn/PaneStreet/releases">Releases</a>
-    <a href="https://github.com/ben4mn/PaneStreet/issues">Issues</a>
-    <a href="https://github.com/ben4mn/PaneStreet/blob/main/LICENSE">MIT License</a>
+    <a href="https://github.com/ben4mn/PaneStreetWindows">GitHub</a>
+    <a href="https://github.com/ben4mn/PaneStreetWindows/releases">Releases</a>
+    <a href="https://github.com/ben4mn/PaneStreetWindows/issues">Issues</a>
+    <a href="https://github.com/ben4mn/PaneStreet">macOS Version</a>
+    <a href="https://github.com/ben4mn/PaneStreetWindows/blob/main/LICENSE">MIT License</a>
   </div>
   <p>Built by <a href="https://github.com/ben4mn">ben4mn</a> &middot; PaneStreet &copy; 2026</p>
 </footer>

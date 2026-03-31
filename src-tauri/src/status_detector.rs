@@ -14,6 +14,7 @@ pub enum SessionStatus {
     Idle,
     WaitingForInput,
     NeedsPermission,
+    ClaudeNeedsInput,
     Error,
     ClaudeFinished,
     Exited,
@@ -26,6 +27,7 @@ impl SessionStatus {
             Self::Idle => "Idle",
             Self::WaitingForInput => "WaitingForInput",
             Self::NeedsPermission => "NeedsPermission",
+            Self::ClaudeNeedsInput => "ClaudeNeedsInput",
             Self::Error => "Error",
             Self::ClaudeFinished => "ClaudeFinished",
             Self::Exited => "Exited",
@@ -131,12 +133,55 @@ pub fn on_exit(session_id: &str, exit_code: i32) {
     emit_status(session_id, "Exited", Some(exit_code));
 }
 
+/// Strip ANSI escape sequences from text for reliable pattern matching.
+fn strip_ansi(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // Skip CSI sequences: ESC [ ... final byte (0x40-0x7E)
+            if chars.peek() == Some(&'[') {
+                chars.next(); // consume '['
+                while let Some(&next) = chars.peek() {
+                    chars.next();
+                    if ('@'..='~').contains(&next) {
+                        break;
+                    }
+                }
+            // Skip OSC sequences: ESC ] ... BEL or ESC \
+            } else if chars.peek() == Some(&']') {
+                chars.next();
+                while let Some(&next) = chars.peek() {
+                    if next == '\x07' {
+                        chars.next();
+                        break;
+                    }
+                    if next == '\x1b' {
+                        chars.next();
+                        if chars.peek() == Some(&'\\') {
+                            chars.next();
+                        }
+                        break;
+                    }
+                    chars.next();
+                }
+            } else {
+                // Skip other single-char escapes
+                chars.next();
+            }
+        } else {
+            result.push(c);
+        }
+    }
+    result
+}
+
 fn analyze_buffer(buffer: &[u8]) -> SessionStatus {
-    let text = String::from_utf8_lossy(buffer);
-    // Only look at the last ~200 chars for prompt detection
-    // Find a valid char boundary to avoid panicking on multi-byte chars
-    let tail = if text.len() > 200 {
-        let mut start = text.len() - 200;
+    let raw = String::from_utf8_lossy(buffer);
+    let text = strip_ansi(&raw);
+    // Look at the last ~400 chars for prompt detection (increased for Claude prompts)
+    let tail = if text.len() > 400 {
+        let mut start = text.len() - 400;
         while start < text.len() && !text.is_char_boundary(start) {
             start += 1;
         }
@@ -144,6 +189,19 @@ fn analyze_buffer(buffer: &[u8]) -> SessionStatus {
     } else {
         &text
     };
+
+    // Claude Code specific: plan approval, input needed, attention needed
+    if tail.contains("Claude Code needs your approval")
+        || tail.contains("Claude Code needs your input")
+        || tail.contains("Claude Code needs your attention")
+    {
+        return SessionStatus::ClaudeNeedsInput;
+    }
+
+    // Claude Code permission prompts (tool use approval)
+    if tail.contains("Claude needs your permission") {
+        return SessionStatus::WaitingForInput;
+    }
 
     // Check for input prompts
     if tail.contains("(y/n)") || tail.contains("(Y/n)") || tail.contains("(yes/no)") {
