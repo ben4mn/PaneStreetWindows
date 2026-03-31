@@ -138,7 +138,7 @@ function updateGridLayout() {
     }
   }
 
-  requestAnimationFrame(() => fitVisibleTerminals());
+  requestAnimationFrame(() => requestAnimationFrame(() => fitVisibleTerminals()));
 }
 
 // --- Grid Gutters (in-grid resize) ---
@@ -1057,6 +1057,13 @@ async function createSession(restoreCwd, restoreScrollback) {
     freeformRect: null,
   };
 
+  // Refit terminal whenever the pane body actually changes size (e.g. grid gutter drags)
+  const paneResizeObserver = new ResizeObserver(() => {
+    if (!session.minimized) terminal.fit();
+  });
+  paneResizeObserver.observe(body);
+  session._resizeObserver = paneResizeObserver;
+
   sessions.push(session);
   rebuildSidebar();
 
@@ -1101,6 +1108,7 @@ async function removeSession(index) {
     if (closedSessionStack.length > MAX_CLOSED_SESSIONS) closedSessionStack.shift();
   } catch {}
 
+  if (session._resizeObserver) session._resizeObserver.disconnect();
   await session.terminal.destroy();
   if (session.pane.parentNode) session.pane.remove();
   sessions.splice(index, 1);
@@ -1379,6 +1387,7 @@ function addSessionToSidebar(name, index, minimized) {
 
   // Click to focus
   card.addEventListener('click', () => {
+    if (isAnyPanelActive()) hidePanel();
     const idx = parseInt(card.dataset.index);
     if (sessions[idx].minimized) {
       restoreSession(idx);
