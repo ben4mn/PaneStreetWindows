@@ -379,14 +379,20 @@ html, body {
   color: var(--accent-light);
 }
 
-/* Drag-and-drop */
+/* Drag-and-drop reordering */
 .session-card.dragging {
   opacity: 0.4;
+  cursor: grabbing;
 }
 
 .session-card.drag-over {
   border-top: 2px solid var(--accent);
   margin-top: -2px;
+}
+
+.session-card.drag-over-below {
+  border-bottom: 2px solid var(--accent);
+  margin-bottom: -2px;
 }
 
 /* Main content area */
