@@ -80,6 +80,15 @@ function setFocused(val) {
 }
 window.addEventListener('focus', () => setFocused(true));
 window.addEventListener('blur', () => setFocused(false));
+
+// Clean up all PTY sessions on window close/reload to prevent console leaks
+window.addEventListener('beforeunload', () => {
+  for (const session of sessions) {
+    if (session.terminal && session.terminal.sessionId) {
+      invoke('kill_pty', { sessionId: session.terminal.sessionId }).catch(() => {});
+    }
+  }
+});
 document.addEventListener('visibilitychange', () => {
   setFocused(!document.hidden);
   document.body.classList.toggle('app-hidden', document.hidden);

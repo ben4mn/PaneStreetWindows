@@ -3832,3 +3832,104 @@ html, body {
   color: var(--text-secondary);
   line-height: 1.5;
 }
+
+/* ── Terminal search bar ── */
+.terminal-search-bar {
+  position: absolute;
+  top: 4px;
+  right: 12px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.terminal-search-bar input {
+  background: var(--bg-pane);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  padding: 3px 8px;
+  width: 180px;
+  outline: none;
+}
+.terminal-search-bar input:focus {
+  border-color: var(--accent);
+}
+.terminal-search-bar .search-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  min-width: 50px;
+  text-align: center;
+}
+.terminal-search-bar button {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 6px;
+  line-height: 1;
+}
+.terminal-search-bar button:hover {
+  background: rgba(255,255,255,0.08);
+  color: var(--text-primary);
+}
+.terminal-search-bar .search-close {
+  font-size: 15px;
+  padding: 1px 5px;
+}
+
+/* ── Terminal right-click context menu ── */
+.terminal-context-menu {
+  position: absolute;
+  z-index: 30;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 0;
+  min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.terminal-context-menu .ctx-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+.terminal-context-menu .ctx-item:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.terminal-context-menu .ctx-item.disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+.terminal-context-menu .ctx-item.disabled:hover {
+  background: none;
+  color: var(--text-muted);
+}
+.terminal-context-menu .ctx-shortcut {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 24px;
+}
+.terminal-context-menu .ctx-item:hover .ctx-shortcut {
+  color: rgba(255,255,255,0.7);
+}
+.terminal-context-menu .ctx-separator {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}

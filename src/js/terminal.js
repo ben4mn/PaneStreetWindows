@@ -1,8 +1,12 @@
 import { Terminal } from '../vendor/xterm/xterm.mjs';
 import { FitAddon } from '../vendor/xterm/addon-fit.mjs';
 import { WebLinksAddon } from '../vendor/xterm/addon-web-links.mjs';
+import { SearchAddon } from '../vendor/xterm/addon-search.mjs';
 
 const { invoke, Channel } = window.__TAURI__.core;
+
+const _isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+const _mod = (e) => _isMac ? e.metaKey : e.ctrlKey;
 
 // Shared encoder/decoder — avoid creating new instances per keystroke
 const _encoder = new TextEncoder();
@@ -55,11 +59,23 @@ export class TerminalSession {
       fontFamily: '"SF Mono", "Cascadia Code", "JetBrains Mono", "Menlo", monospace',
       lineHeight: 1.1,
       theme: getSavedTerminalTheme(),
+      minimumContrastRatio: 4.5,
+      windowsPty: { backend: 'conpty' },
     });
 
     this.fitAddon = new FitAddon();
     this.term.loadAddon(this.fitAddon);
-    this.term.loadAddon(new WebLinksAddon());
+
+    // Ctrl+Click (Cmd+Click on Mac) to open links — matches VS Code behavior
+    this.term.loadAddon(new WebLinksAddon((e, uri) => {
+      if (_mod(e)) {
+        window.open(uri, '_blank');
+      }
+    }));
+
+    // Search addon for find-in-terminal
+    this.searchAddon = new SearchAddon();
+    this.term.loadAddon(this.searchAddon);
 
     // Intercept Shift+Enter BEFORE xterm processes it.
     // Uses platform-specific encoding via send_shift_enter command:
@@ -67,12 +83,88 @@ export class TerminalSession {
     // - Windows: win32-input-mode sequence that ConPTY natively understands
     const self = this;
     this.term.attachCustomKeyEventHandler((e) => {
-      if (e.type === 'keydown' && e.key === 'Enter' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      if (e.type === 'keydown' && e.key === 'Enter' && e.shiftKey && !_mod(e) && !e.altKey) {
         if (self.sessionId) {
           invoke('send_shift_enter', { sessionId: self.sessionId })
             .catch(() => {});
         }
         return false;
+      }
+      // Mod+C: copy if there's a selection, otherwise send SIGINT as normal
+      if (e.type === 'keydown' && e.key === 'c' && _mod(e) && !e.shiftKey && !e.altKey) {
+        const sel = self.term.getSelection();
+        if (sel) {
+          navigator.clipboard.writeText(sel);
+          self.term.clearSelection();
+          return false;
+        }
+      }
+      // Mod+Shift+C: always copy (works even in apps that capture Ctrl+C)
+      if (e.type === 'keydown' && e.key === 'C' && _mod(e) && e.shiftKey && !e.altKey) {
+        const sel = self.term.getSelection();
+        if (sel) {
+          navigator.clipboard.writeText(sel);
+          self.term.clearSelection();
+        }
+        return false;
+      }
+      // Mod+V: paste from clipboard
+      if (e.type === 'keydown' && e.key === 'v' && _mod(e) && !e.shiftKey && !e.altKey) {
+        navigator.clipboard.readText().then(text => {
+          if (text && self.sessionId) {
+            invoke('write_to_pty', { sessionId: self.sessionId, data: Array.from(_encoder.encode(text)) });
+          }
+        });
+        return false;
+      }
+      // Mod+Shift+V: always paste
+      if (e.type === 'keydown' && e.key === 'V' && _mod(e) && e.shiftKey && !e.altKey) {
+        navigator.clipboard.readText().then(text => {
+          if (text && self.sessionId) {
+            invoke('write_to_pty', { sessionId: self.sessionId, data: Array.from(_encoder.encode(text)) });
+          }
+        });
+        return false;
+      }
+      // Mod+Shift+F: find in terminal
+      if (e.type === 'keydown' && e.key === 'F' && _mod(e) && e.shiftKey && !e.altKey) {
+        self.toggleSearchBar();
+        return false;
+      }
+      // Escape: close search bar if open
+      if (e.type === 'keydown' && e.key === 'Escape' && self._searchBarVisible) {
+        self.hideSearchBar();
+        return false;
+      }
+      // Scroll shortcuts
+      if (e.type === 'keydown' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        if (e.key === 'PageUp') { self.term.scrollPages(-1); return false; }
+        if (e.key === 'PageDown') { self.term.scrollPages(1); return false; }
+      }
+      if (e.type === 'keydown' && _mod(e) && !e.shiftKey && !e.altKey) {
+        if (e.key === 'Home') { self.term.scrollToTop(); return false; }
+        if (e.key === 'End') { self.term.scrollToBottom(); return false; }
+      }
+      // Ctrl+Left/Right: move by word (use readline ESC b/f — universally supported)
+      if (e.type === 'keydown' && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey && self.sessionId) {
+        if (e.key === 'ArrowLeft') {
+          invoke('write_to_pty', { sessionId: self.sessionId, data: Array.from(_encoder.encode('\x1bb')) });
+          return false;
+        }
+        if (e.key === 'ArrowRight') {
+          invoke('write_to_pty', { sessionId: self.sessionId, data: Array.from(_encoder.encode('\x1bf')) });
+          return false;
+        }
+        // Ctrl+Backspace: delete word behind cursor
+        if (e.key === 'Backspace') {
+          invoke('write_to_pty', { sessionId: self.sessionId, data: Array.from(_encoder.encode('\x17')) });
+          return false;
+        }
+        // Ctrl+Delete: delete word ahead of cursor
+        if (e.key === 'Delete') {
+          invoke('write_to_pty', { sessionId: self.sessionId, data: Array.from(_encoder.encode('\x1bd')) });
+          return false;
+        }
       }
       return true;
     });
@@ -164,6 +256,7 @@ export class TerminalSession {
   open() {
     this.term.open(this.container);
     this.resizeObserver.observe(this.container);
+    this._setupContextMenu();
     // Fit after layout has settled
     requestAnimationFrame(() => this.fit());
 
@@ -228,6 +321,7 @@ export class TerminalSession {
       cols: this.term.cols,
       cwd: cwd || null,
       sessionId: sessionId || null,
+      shell: localStorage.getItem('ps-shell') || null,
       onData: channel,
     });
 
@@ -273,6 +367,9 @@ export class TerminalSession {
 
   focus() {
     this.term.focus();
+    // Force full redraw to clear stale TUI artifacts (e.g. after clicking
+    // away from a full-screen app like `claude -r` and clicking back).
+    this.term.refresh(0, this.term.rows - 1);
   }
 
   /**
@@ -306,6 +403,155 @@ export class TerminalSession {
     if (!content) return;
     // Write the content with newlines so it appears as previous output
     this.term.write(content.replace(/\n/g, '\r\n') + '\r\n');
+  }
+
+  // --- Search bar (find in terminal) ---
+  _searchBarVisible = false;
+  _searchBar = null;
+
+  toggleSearchBar() {
+    if (this._searchBarVisible) {
+      this.hideSearchBar();
+    } else {
+      this.showSearchBar();
+    }
+  }
+
+  showSearchBar() {
+    if (this._searchBar) {
+      this._searchBarVisible = true;
+      this._searchBar.style.display = 'flex';
+      this._searchBar.querySelector('input').focus();
+      return;
+    }
+
+    const bar = document.createElement('div');
+    bar.className = 'terminal-search-bar';
+    bar.innerHTML = `
+      <input type="text" placeholder="Find..." spellcheck="false" />
+      <span class="search-count"></span>
+      <button class="search-prev" title="Previous (Shift+Enter)">&#x25B2;</button>
+      <button class="search-next" title="Next (Enter)">&#x25BC;</button>
+      <button class="search-close" title="Close (Escape)">&times;</button>
+    `;
+
+    const input = bar.querySelector('input');
+    const countEl = bar.querySelector('.search-count');
+    const prevBtn = bar.querySelector('.search-prev');
+    const nextBtn = bar.querySelector('.search-next');
+    const closeBtn = bar.querySelector('.search-close');
+
+    const updateCount = () => {
+      // SearchAddon fires onDidChangeResults if available
+    };
+
+    let resultListener = null;
+    if (this.searchAddon.onDidChangeResults) {
+      resultListener = this.searchAddon.onDidChangeResults(({ resultIndex, resultCount }) => {
+        countEl.textContent = resultCount > 0 ? `${resultIndex + 1}/${resultCount}` : 'No results';
+      });
+    }
+
+    const doSearch = (direction) => {
+      const query = input.value;
+      if (!query) {
+        this.searchAddon.clearDecorations();
+        countEl.textContent = '';
+        return;
+      }
+      if (direction === 'prev') {
+        this.searchAddon.findPrevious(query, { incremental: true });
+      } else {
+        this.searchAddon.findNext(query, { incremental: true });
+      }
+    };
+
+    input.addEventListener('input', () => doSearch('next'));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); doSearch('prev'); }
+      else if (e.key === 'Enter') { e.preventDefault(); doSearch('next'); }
+      else if (e.key === 'Escape') { e.preventDefault(); this.hideSearchBar(); }
+      e.stopPropagation();
+    });
+    input.addEventListener('keyup', (e) => e.stopPropagation());
+    input.addEventListener('keypress', (e) => e.stopPropagation());
+    prevBtn.addEventListener('click', () => doSearch('prev'));
+    nextBtn.addEventListener('click', () => doSearch('next'));
+    closeBtn.addEventListener('click', () => this.hideSearchBar());
+
+    // Stop clicks in the search bar from propagating to pane focus handlers
+    bar.addEventListener('mousedown', (e) => e.stopPropagation());
+
+    this._searchBar = bar;
+    this._searchBarResultListener = resultListener;
+    this._searchBarVisible = true;
+    this.container.style.position = 'relative';
+    this.container.appendChild(bar);
+    input.focus();
+  }
+
+  hideSearchBar() {
+    if (!this._searchBar) return;
+    this._searchBarVisible = false;
+    this._searchBar.style.display = 'none';
+    this.searchAddon.clearDecorations();
+    this.term.focus();
+  }
+
+  // --- Right-click context menu ---
+  _setupContextMenu() {
+    this.container.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      // Remove any existing menu
+      document.querySelectorAll('.terminal-context-menu').forEach(m => m.remove());
+
+      const menu = document.createElement('div');
+      menu.className = 'terminal-context-menu';
+
+      const mod = _isMac ? '\u2318' : 'Ctrl+';
+      const items = [
+        { label: 'Copy', shortcut: `${mod}C`, action: () => {
+          const sel = this.term.getSelection();
+          if (sel) navigator.clipboard.writeText(sel);
+        }, disabled: !this.term.getSelection() },
+        { label: 'Paste', shortcut: `${mod}V`, action: () => {
+          navigator.clipboard.readText().then(text => {
+            if (text && this.sessionId) invoke('write_to_pty', { sessionId: this.sessionId, data: Array.from(_encoder.encode(text)) });
+          });
+        }},
+        { label: 'Select All', action: () => this.term.selectAll() },
+        { type: 'separator' },
+        { label: 'Find...', shortcut: `${mod}Shift+F`, action: () => this.showSearchBar() },
+        { label: 'Clear', action: () => this.term.clear() },
+      ];
+
+      for (const item of items) {
+        if (item.type === 'separator') {
+          const sep = document.createElement('div');
+          sep.className = 'ctx-separator';
+          menu.appendChild(sep);
+          continue;
+        }
+        const row = document.createElement('div');
+        row.className = 'ctx-item' + (item.disabled ? ' disabled' : '');
+        row.innerHTML = `<span>${item.label}</span>${item.shortcut ? `<span class="ctx-shortcut">${item.shortcut}</span>` : ''}`;
+        if (!item.disabled) {
+          row.addEventListener('click', () => { menu.remove(); item.action(); });
+        }
+        menu.appendChild(row);
+      }
+
+      // Position near cursor, but keep on screen
+      menu.style.left = `${e.offsetX}px`;
+      menu.style.top = `${e.offsetY}px`;
+      this.container.appendChild(menu);
+
+      // Close on any click outside
+      const closeMenu = (ev) => {
+        if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener('mousedown', closeMenu, true); }
+      };
+      setTimeout(() => document.addEventListener('mousedown', closeMenu, true), 0);
+    });
   }
 
   async destroy() {

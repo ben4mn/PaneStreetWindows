@@ -39,6 +39,89 @@ fn find_windows_shell() -> String {
     std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string())
 }
 
+#[derive(Clone, Serialize)]
+pub struct ShellOption {
+    pub name: String,
+    pub path: String,
+}
+
+/// Detect available shells on the system.
+#[tauri::command]
+pub fn detect_shells() -> Vec<ShellOption> {
+    let mut shells = Vec::new();
+
+    #[cfg(windows)]
+    {
+        // PowerShell 7+ (pwsh)
+        if let Ok(output) = crate::cmd_util::silent_cmd("where.exe").arg("pwsh.exe").output() {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                if let Some(path) = stdout.lines().next() {
+                    let path = path.trim();
+                    if !path.is_empty() {
+                        shells.push(ShellOption { name: "PowerShell 7".into(), path: path.to_string() });
+                    }
+                }
+            }
+        }
+
+        // Windows PowerShell 5.x
+        let ps5 = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+        if std::path::Path::new(ps5).exists() {
+            shells.push(ShellOption { name: "Windows PowerShell".into(), path: ps5.to_string() });
+        }
+
+        // cmd.exe
+        let cmd = std::env::var("COMSPEC").unwrap_or_else(|_| "C:\\Windows\\System32\\cmd.exe".to_string());
+        if std::path::Path::new(&cmd).exists() {
+            shells.push(ShellOption { name: "Command Prompt".into(), path: cmd });
+        }
+
+        // Git Bash
+        let git_bash_paths = [
+            "C:\\Program Files\\Git\\bin\\bash.exe",
+            "C:\\Program Files (x86)\\Git\\bin\\bash.exe",
+        ];
+        for gb in &git_bash_paths {
+            if std::path::Path::new(gb).exists() {
+                shells.push(ShellOption { name: "Git Bash".into(), path: gb.to_string() });
+                break;
+            }
+        }
+
+        // WSL
+        if let Ok(output) = crate::cmd_util::silent_cmd("where.exe").arg("wsl.exe").output() {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                if let Some(path) = stdout.lines().next() {
+                    let path = path.trim();
+                    if !path.is_empty() {
+                        shells.push(ShellOption { name: "WSL".into(), path: path.to_string() });
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    {
+        let unix_shells = [
+            ("Zsh", "/bin/zsh"),
+            ("Bash", "/bin/bash"),
+            ("Fish", "/usr/local/bin/fish"),
+            ("Fish", "/opt/homebrew/bin/fish"),
+        ];
+        let mut seen = std::collections::HashSet::new();
+        for (name, path) in &unix_shells {
+            if std::path::Path::new(path).exists() && seen.insert(*name) {
+                shells.push(ShellOption { name: name.to_string(), path: path.to_string() });
+            }
+        }
+    }
+
+    shells
+}
+
 struct PtyHandle {
     writer: Box<dyn Write + Send>,
     master: Box<dyn portable_pty::MasterPty + Send>,
@@ -69,6 +152,7 @@ pub fn spawn_pty(
     cols: u16,
     cwd: Option<String>,
     session_id: Option<String>,
+    shell: Option<String>,
     on_data: Channel<PtyOutput>,
 ) -> Result<String, String> {
     // Initialize status detector with app handle (idempotent)
@@ -87,11 +171,16 @@ pub fn spawn_pty(
         .openpty(size)
         .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
-    // Determine the user's shell
-    #[cfg(unix)]
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
-    #[cfg(windows)]
-    let shell = find_windows_shell();
+    // Determine the user's shell — use explicit override if provided
+    let shell = match shell {
+        Some(ref s) if !s.is_empty() => s.clone(),
+        _ => {
+            #[cfg(unix)]
+            { std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string()) }
+            #[cfg(windows)]
+            { find_windows_shell() }
+        }
+    };
 
     let mut cmd = CommandBuilder::new(&shell);
     #[cfg(unix)]
@@ -149,17 +238,20 @@ pub fn spawn_pty(
                 Ok(n) => {
                     let data = buf[..n].to_vec();
 
-                    // Status detection on each chunk
-                    if let Some(new_status) = status_detector::on_output(&sid_for_thread, &data) {
+                    // Send data to the frontend FIRST — this is the latency-critical path.
+                    // Status detection runs after so it never blocks rendering.
+                    let data_for_status = data.clone();
+                    if on_data.send(PtyOutput { data }).is_err() {
+                        break; // Channel closed
+                    }
+
+                    // Status detection after send — UI already has the bytes
+                    if let Some(new_status) = status_detector::on_output(&sid_for_thread, &data_for_status) {
                         status_detector::emit_status(
                             &sid_for_thread,
                             new_status.as_str(),
                             None,
                         );
-                    }
-
-                    if on_data.send(PtyOutput { data }).is_err() {
-                        break; // Channel closed
                     }
                 }
                 Err(_) => break,
@@ -232,17 +324,44 @@ pub fn resize_pty(session_id: String, rows: u16, cols: u16) -> Result<(), String
 
 #[tauri::command]
 pub fn kill_pty(session_id: String) -> Result<(), String> {
-    let mut map = PTY_MAP
-        .lock()
-        .map_err(|e| format!("Lock error: {}", e))?;
+    let handle = {
+        let mut map = PTY_MAP
+            .lock()
+            .map_err(|e| format!("Lock error: {}", e))?;
+        map.remove(&session_id)
+    };
 
-    if let Some(mut handle) = map.remove(&session_id) {
+    if let Some(mut handle) = handle {
+        // Kill the child process, then wait for it to release its console allocation.
+        // Dropping master/writer closes the PTY pair so the read thread exits too.
         let _ = handle.child.kill();
+        let _ = handle.child.wait();
+        // Explicitly drop the master PTY handle to release the ConPTY console
+        drop(handle.master);
+        drop(handle.writer);
     }
 
     status_detector::unregister_session(&session_id);
 
     Ok(())
+}
+
+/// Kill all active PTY sessions. Called on app exit to prevent console leaks.
+pub fn kill_all_sessions() {
+    let handles: Vec<(String, PtyHandle)> = {
+        match PTY_MAP.lock() {
+            Ok(mut map) => map.drain().collect(),
+            Err(_) => return,
+        }
+    };
+
+    for (sid, mut handle) in handles {
+        let _ = handle.child.kill();
+        let _ = handle.child.wait();
+        drop(handle.master);
+        drop(handle.writer);
+        status_detector::unregister_session(&sid);
+    }
 }
 
 #[tauri::command]
