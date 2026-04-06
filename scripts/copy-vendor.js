@@ -26,7 +26,7 @@ fs.copyFileSync(path.join(xtermSrc, 'lib', 'xterm.mjs'), path.join(xtermDest, 'x
 fs.copyFileSync(path.join(xtermSrc, 'css', 'xterm.css'), path.join(xtermDest, 'xterm.css'));
 
 // xterm addons
-const addons = ['addon-fit', 'addon-webgl', 'addon-web-links'];
+const addons = ['addon-fit', 'addon-webgl', 'addon-web-links', 'addon-search'];
 for (const addon of addons) {
   const src = path.join(nm, '@xterm', addon, 'lib', `${addon}.mjs`);
   const dest = path.join(vendor, 'xterm', `${addon}.mjs`);
