@@ -23,6 +23,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             pty_manager::spawn_pty,
+            pty_manager::detect_shells,
             pty_manager::write_to_pty,
             pty_manager::resize_pty,
             pty_manager::kill_pty,
@@ -53,6 +54,11 @@ pub fn run() {
             pty_manager::get_pr_status,
             pty_manager::send_shift_enter,
         ])
+        .on_window_event(|_window, event| {
+            if let tauri::WindowEvent::Destroyed = event {
+                pty_manager::kill_all_sessions();
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

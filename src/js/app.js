@@ -80,6 +80,15 @@ function setFocused(val) {
 }
 window.addEventListener('focus', () => setFocused(true));
 window.addEventListener('blur', () => setFocused(false));
+
+// Clean up all PTY sessions on window close/reload to prevent console leaks
+window.addEventListener('beforeunload', () => {
+  for (const session of sessions) {
+    if (session.terminal && session.terminal.sessionId) {
+      invoke('kill_pty', { sessionId: session.terminal.sessionId }).catch(() => {});
+    }
+  }
+});
 document.addEventListener('visibilitychange', () => {
   setFocused(!document.hidden);
   document.body.classList.toggle('app-hidden', document.hidden);
@@ -1330,7 +1339,6 @@ function addSessionToSidebar(name, index, minimized) {
   if (index === focusedIndex) card.classList.add('active');
   card.dataset.index = index;
   card.dataset.status = sessions[index]?.status || 'Idle';
-  card.draggable = true;
 
   const dot = document.createElement('span');
   dot.className = 'status-dot';
@@ -1408,37 +1416,8 @@ function addSessionToSidebar(name, index, minimized) {
     showContextMenu(e.clientX, e.clientY, parseInt(card.dataset.index));
   });
 
-  // Drag-and-drop reordering
-  card.addEventListener('dragstart', (e) => {
-    card.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', card.dataset.index);
-  });
-
-  card.addEventListener('dragend', () => {
-    card.classList.remove('dragging');
-    document.querySelectorAll('.session-card').forEach(c => c.classList.remove('drag-over'));
-  });
-
-  card.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    card.classList.add('drag-over');
-  });
-
-  card.addEventListener('dragleave', () => {
-    card.classList.remove('drag-over');
-  });
-
-  card.addEventListener('drop', (e) => {
-    e.preventDefault();
-    card.classList.remove('drag-over');
-    const fromIdx = parseInt(e.dataTransfer.getData('text/plain'));
-    const toIdx = parseInt(card.dataset.index);
-    if (fromIdx !== toIdx) {
-      reorderSession(fromIdx, toIdx);
-    }
-  });
+  // Drag reordering is handled by mousedown on the #session-list container
+  // (see setupSessionListDragDrop) — no HTML5 drag API needed.
 
   list.appendChild(card);
 }
@@ -1471,6 +1450,86 @@ function reorderSession(fromIdx, toIdx) {
   updateGridLayout();
   updateFooterPills();
   saveSessionState();
+}
+
+function setupSessionListDragDrop() {
+  const list = document.getElementById('session-list');
+  let dragState = null;
+
+  list.addEventListener('mousedown', (e) => {
+    const card = e.target.closest('.session-card');
+    if (!card || e.button !== 0) return;
+    // Don't start drag on buttons or during rename
+    if (e.target.closest('button') || e.target.closest('input')) return;
+
+    const startY = e.clientY;
+    const fromIdx = parseInt(card.dataset.index);
+
+    dragState = { card, fromIdx, startY, started: false };
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!dragState) return;
+
+    // Require 5px movement to start drag (distinguish from click)
+    if (!dragState.started) {
+      if (Math.abs(e.clientY - dragState.startY) < 5) return;
+      dragState.started = true;
+      dragState.card.classList.add('dragging');
+      document.body.style.cursor = 'grabbing';
+      document.body.style.userSelect = 'none';
+    }
+
+    // Find nearest card and show drop indicator
+    const cards = [...list.querySelectorAll('.session-card:not(.dragging)')];
+    cards.forEach(c => c.classList.remove('drag-over', 'drag-over-below'));
+
+    let closest = null;
+    let closestDist = Infinity;
+    let insertBelow = false;
+    for (const c of cards) {
+      const rect = c.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      const dist = Math.abs(e.clientY - mid);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closest = c;
+        insertBelow = e.clientY > mid;
+      }
+    }
+    if (closest) {
+      closest.classList.add(insertBelow ? 'drag-over-below' : 'drag-over');
+    }
+    dragState.insertBelow = insertBelow;
+    dragState.targetCard = closest;
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragState) return;
+
+    if (dragState.started && dragState.targetCard) {
+      const toIdx = parseInt(dragState.targetCard.dataset.index);
+      const fromIdx = dragState.fromIdx;
+      // Visual position: "above card N" = position N, "below card N" = position N+1
+      const visualTarget = dragState.insertBelow ? toIdx + 1 : toIdx;
+      // After splicing out fromIdx, indices shift down above the removal point
+      const finalIdx = fromIdx < visualTarget ? visualTarget - 1 : visualTarget;
+      if (fromIdx !== finalIdx) {
+        reorderSession(fromIdx, finalIdx);
+      }
+    }
+
+    // Cleanup
+    if (dragState.started) {
+      dragState.card.classList.remove('dragging');
+      list.querySelectorAll('.session-card').forEach(c => {
+        c.classList.remove('drag-over', 'drag-over-below');
+      });
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+    dragState = null;
+  });
 }
 
 function updateSidebarMeta() {
@@ -3244,6 +3303,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupShortcuts();
   setupResizeHandles();
   setupSidebarToggle();
+  setupSessionListDragDrop();
   setupGitInfoClick();
   setupFooterExpand();
   setupConfigButtons();

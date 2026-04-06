@@ -271,8 +271,10 @@ async function renderSettingsTab(tab) {
 
         <div class="setting-row-stacked">
           <div class="setting-label">Default Shell</div>
-          <div class="setting-description">Leave empty to use system default (${navigator.platform.indexOf('Win') >= 0 ? '%COMSPEC%' : '$SHELL'})</div>
-          <input type="text" class="form-input setting-input-full" id="pref-shell" value="${shell}" placeholder="${navigator.platform.indexOf('Win') >= 0 ? 'powershell.exe' : '/bin/zsh'}" />
+          <div class="setting-description">Select a shell for new terminals</div>
+          <select class="form-input setting-input-full" id="pref-shell">
+            <option value="">System Default</option>
+          </select>
         </div>
 
         <div class="setting-row-stacked">
@@ -470,6 +472,26 @@ async function renderSettingsTab(tab) {
       const val = Math.min(24, Math.max(10, parseInt(numberEl.value) || 14));
       rangeEl.value = val;
       previewEl.style.fontSize = val + 'px';
+    });
+
+    // Populate shell dropdown
+    const shellSelect = container.querySelector('#pref-shell');
+    invoke('detect_shells').then(shells => {
+      shells.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.path;
+        opt.textContent = `${s.name} — ${s.path}`;
+        if (s.path === shell) opt.selected = true;
+        shellSelect.appendChild(opt);
+      });
+      // If saved shell doesn't match any detected option, add it as custom
+      if (shell && !shells.some(s => s.path === shell)) {
+        const opt = document.createElement('option');
+        opt.value = shell;
+        opt.textContent = `Custom — ${shell}`;
+        opt.selected = true;
+        shellSelect.appendChild(opt);
+      }
     });
 
     // Git poll interval range
