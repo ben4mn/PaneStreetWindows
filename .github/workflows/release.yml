@@ -49,9 +49,8 @@ jobs:
         run: npm run vendor
 
       - name: Fix yanked dependencies
-        run: |
-          cd src-tauri
-          cargo update
+        working-directory: src-tauri
+        run: cargo update -p window-vibrancy || cargo update
 
       - name: Build Tauri app
         env:
