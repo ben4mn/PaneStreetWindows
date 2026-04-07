@@ -1,7 +1,6 @@
-name: Debug Build
+name: Debug Build 2
 on:
   workflow_dispatch:
-
 jobs:
   debug:
     runs-on: windows-latest
@@ -17,14 +16,8 @@ jobs:
           workspaces: src-tauri
       - run: npm ci
       - run: npm run vendor
-      - name: Build with verbose output
+      - name: Build Tauri with signing
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npx tauri build --verbose 2>&1 | tail -200
-        continue-on-error: true
-      - name: Check cargo build separately
-        run: |
-          cd src-tauri
-          cargo build --release 2>&1 | tail -100
-        continue-on-error: true
+        run: npx tauri build 2>&1
