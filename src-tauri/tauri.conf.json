@@ -42,7 +42,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI5RTVCMEYzQ0M0MTk4QTAKUldTZ21FSE04N0RsdWRsM0o4clV0SXBGV3FhQzVHeWJaeFhSdHFiUnJHb2YyWk9hZ1lobzhWQjcK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI0REU3NkQ3OTVDRjIwNTEKUldSUklNK1YxM2JldE9MOFZtN2VoOWk2YVVaVVE2Q3FmckdhN1lONUhmWHJxOWlBWFJtUEYxSWUK",
       "endpoints": [
         "https://github.com/ben4mn/PaneStreetWindows/releases/latest/download/latest.json"
       ]
