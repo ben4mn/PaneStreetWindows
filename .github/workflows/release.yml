@@ -53,9 +53,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         shell: bash
-        run: |
-          rm -f src-tauri/Cargo.lock
-          npx tauri build
+        run: npx tauri build
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

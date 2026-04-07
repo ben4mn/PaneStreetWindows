@@ -2618,7 +2618,7 @@ dependencies = [
 
 [[package]]
 name = "pane-street"
-version = "0.6.1"
+version = "0.5.1"
 dependencies = [
  "dirs",
  "git2",
@@ -5420,7 +5420,7 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 name = "window-vibrancy"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6152dc69b7660589e8ad23bb7585e16bcadbb59e7e7959f79b528e22397745e"
+checksum = "d9bec5a31f3f9362f2258fd0e9c9dd61a9ca432e7306cc78c444258f0dce9a9c"
 dependencies = [
  "objc2",
  "objc2-app-kit",
