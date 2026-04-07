@@ -52,8 +52,16 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
-        run: npx tauri build
+        run: |
+          npx tauri build 2>&1 | tee build.log; EXIT=${PIPESTATUS[0]}
+          if [ $EXIT -ne 0 ]; then
+            ERRORS=$(grep -i "error\|failed\|fatal\|signing" build.log | tail -20)
+            TAIL=$(tail -50 build.log)
+            gh issue create --title "Build failed (exit=$EXIT)" --body "$(printf '```\n%s\n\n=== ERRORS ===\n%s\n```' "$TAIL" "$ERRORS")" || true
+            exit $EXIT
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
