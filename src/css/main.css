@@ -1114,7 +1114,7 @@ html, body {
   bottom: var(--footer-height);
   left: var(--sidebar-width);
   right: 0;
-  height: 80px;
+  height: 90px;
   pointer-events: none;
   z-index: 100;
   overflow: visible;
@@ -1170,8 +1170,8 @@ html, body {
   position: absolute;
   bottom: 0;
   left: 4px;
-  width: 56px;
-  height: 56px;
+  width: 68px;
+  height: 72px;
   cursor: pointer;
   transition: left 10s linear;
   overflow: visible;
@@ -1181,14 +1181,26 @@ html, body {
   overflow: visible;
 }
 
-/* --- Always-on ambient (very subtle, slow) --- */
-.robot-eyes { animation: robot-blink 8s ease-in-out infinite; }
+/* Mouth expressions — only smile visible by default */
+.robot-mouth-grin,
+.robot-mouth-flat,
+.robot-mouth-open { display: none; }
+
+/* Broom prop — hidden by default, shown in sweep/mop animations */
+.robot-broom-prop { display: none; }
+#footer-mascot.act-sweep .robot-broom-prop,
+#footer-mascot.act-mop .robot-broom-prop { display: block; }
+
+/* --- Always-on ambient (subtle, matches Mac timings) --- */
+.robot-antenna { animation: robot-antenna 4s ease-in-out infinite; transform-origin: 18px 6.5px; }
 .robot-chest-glow { animation: robot-glow 6s ease-in-out infinite; }
-.robot-antenna { animation: robot-antenna 6s ease-in-out infinite; transform-origin: 14px 5px; }
+.robot-eye-l { animation: robot-blink 6s ease-in-out infinite; }
+.robot-eye-r { animation: robot-blink 6s ease-in-out 0.06s infinite; }
+.robot-body { animation: idle-hover 4s ease-in-out infinite; transform-origin: center bottom; }
 
 @keyframes robot-blink {
-  0%, 46%, 49%, 100% { opacity: 1; }
-  47.5% { opacity: 0.1; }
+  0%, 44%, 50%, 100% { transform: scaleY(1); }
+  47% { transform: scaleY(0); }
 }
 @keyframes robot-glow {
   0%, 100% { opacity: 0.4; }
@@ -1229,7 +1241,7 @@ html, body {
 }
 #footer-mascot.walking .robot-antenna {
   animation: walk-antenna-bounce 0.25s ease-in-out infinite alternate;
-  transform-origin: 14px 5px;
+  transform-origin: 18px 6.5px;
 }
 @keyframes walk-antenna-bounce {
   0% { transform: rotate(-6deg); }
@@ -1331,7 +1343,7 @@ html, body {
 /* Waving — right arm goes up with body counter-sway */
 #footer-mascot.act-wave .robot-arm-r {
   animation: wave-arm 0.7s ease-in-out 5;
-  transform-origin: 21.5px 21px;
+  transform-origin: 27px 23.5px;
 }
 #footer-mascot.act-wave .robot-body {
   animation: wave-body 0.7s ease-in-out 5;
@@ -1354,7 +1366,7 @@ html, body {
 }
 #footer-mascot.act-sleep .robot-antenna {
   animation: sleep-antenna 4s ease-in-out infinite;
-  transform-origin: 14px 5px;
+  transform-origin: 18px 6.5px;
 }
 #footer-mascot.act-sleep .robot-chest-glow { animation-duration: 6s; }
 #footer-mascot.act-sleep .robot-shadow {
@@ -1376,11 +1388,11 @@ html, body {
 /* Stretching — arms go up with body stretch */
 #footer-mascot.act-stretch .robot-arm-l {
   animation: stretch-l 2s ease-in-out 2;
-  transform-origin: 6.5px 21px;
+  transform-origin: 9px 23.5px;
 }
 #footer-mascot.act-stretch .robot-arm-r {
   animation: stretch-r 2s ease-in-out 2;
-  transform-origin: 21.5px 21px;
+  transform-origin: 27px 23.5px;
 }
 #footer-mascot.act-stretch .robot-body {
   animation: stretch-body 2s ease-in-out 2;
@@ -1419,11 +1431,11 @@ html, body {
 }
 #footer-mascot.act-think .robot-arm-l {
   transform: rotate(30deg) translateY(-2px);
-  transform-origin: 6.5px 21px;
+  transform-origin: 9px 23.5px;
 }
 #footer-mascot.act-think .robot-antenna {
   animation: think-antenna 1.5s ease-in-out infinite;
-  transform-origin: 14px 5px;
+  transform-origin: 18px 6.5px;
 }
 #footer-mascot.act-think .robot-antenna circle {
   animation: think-antenna-tip 1.5s ease-in-out infinite;
@@ -1448,11 +1460,11 @@ html, body {
 }
 #footer-mascot.act-dance .robot-arm-l {
   animation: dance-arm-l 0.8s ease-in-out infinite;
-  transform-origin: 6.5px 21px;
+  transform-origin: 9px 23.5px;
 }
 #footer-mascot.act-dance .robot-arm-r {
   animation: dance-arm-r 0.8s ease-in-out infinite;
-  transform-origin: 21.5px 21px;
+  transform-origin: 27px 23.5px;
 }
 #footer-mascot.act-dance .robot-leg-left {
   animation: dance-leg-l 0.8s ease-in-out infinite;
@@ -1547,11 +1559,11 @@ html, body {
 }
 #footer-mascot.act-sweep .robot-arm-l {
   animation: sweep-arm-l 1.2s ease-in-out infinite;
-  transform-origin: 6.5px 21px;
+  transform-origin: 9px 23.5px;
 }
 #footer-mascot.act-sweep .robot-arm-r {
   animation: sweep-arm-r 1.2s ease-in-out infinite;
-  transform-origin: 21.5px 21px;
+  transform-origin: 27px 23.5px;
 }
 @keyframes sweep-body {
   0%, 100% { transform: rotate(2deg) translateY(0); }
@@ -1569,7 +1581,7 @@ html, body {
 /* Phone call — arm to head, gentle talking nod */
 #footer-mascot.act-phone .robot-arm-r {
   transform: rotate(-50deg) translateY(-4px);
-  transform-origin: 21.5px 21px;
+  transform-origin: 27px 23.5px;
 }
 #footer-mascot.act-phone .robot-body {
   animation: phone-nod 1.8s ease-in-out infinite;
@@ -1599,11 +1611,11 @@ html, body {
 }
 #footer-mascot.act-code .robot-arm-l {
   animation: code-tap-l 0.3s ease-in-out infinite;
-  transform-origin: 6.5px 21px;
+  transform-origin: 9px 23.5px;
 }
 #footer-mascot.act-code .robot-arm-r {
   animation: code-tap-r 0.3s ease-in-out infinite;
-  transform-origin: 21.5px 21px;
+  transform-origin: 27px 23.5px;
 }
 #footer-mascot.act-code .robot-chest-glow {
   animation: code-glow 0.5s ease-in-out infinite;
@@ -1636,7 +1648,7 @@ html, body {
 }
 #footer-mascot.act-mop .robot-arm-l {
   animation: mop-arm 1.6s ease-in-out infinite;
-  transform-origin: 6.5px 21px;
+  transform-origin: 9px 23.5px;
 }
 #footer-mascot.act-mop .robot-leg-left {
   animation: mop-leg-l 1.6s ease-in-out infinite;
@@ -1668,11 +1680,11 @@ html, body {
 }
 #footer-mascot.act-shimmy .robot-arm-l {
   animation: shimmy-arm-l 0.5s ease-in-out infinite;
-  transform-origin: 6.5px 21px;
+  transform-origin: 9px 23.5px;
 }
 #footer-mascot.act-shimmy .robot-arm-r {
   animation: shimmy-arm-r 0.5s ease-in-out infinite;
-  transform-origin: 21.5px 21px;
+  transform-origin: 27px 23.5px;
 }
 #footer-mascot.act-shimmy .robot-eye-l,
 #footer-mascot.act-shimmy .robot-eye-r {
@@ -1698,7 +1710,7 @@ html, body {
 /* Antenna fix — reaching up to adjust antenna */
 #footer-mascot.act-antenna-fix .robot-arm-r {
   animation: antenna-fix-arm 0.6s ease-in-out;
-  transform-origin: 21.5px 21px;
+  transform-origin: 27px 23.5px;
 }
 #footer-mascot.act-antenna-fix .robot-antenna {
   animation: antenna-fix-spring 0.6s ease-in-out;
@@ -1834,15 +1846,15 @@ html, body {
 }
 #footer-mascot.act-falling .robot-arm-l {
   animation: falling-arm-l 0.45s ease-in-out infinite alternate;
-  transform-origin: 6.5px 21px;
+  transform-origin: 9px 23.5px;
 }
 #footer-mascot.act-falling .robot-arm-r {
   animation: falling-arm-r 0.45s ease-in-out infinite alternate;
-  transform-origin: 21.5px 21px;
+  transform-origin: 27px 23.5px;
 }
 #footer-mascot.act-falling .robot-antenna {
   animation: falling-antenna 0.4s ease-in-out infinite alternate;
-  transform-origin: 14px 5px;
+  transform-origin: 18px 6.5px;
 }
 #footer-mascot.act-falling .robot-body {
   animation: falling-wobble 0.5s ease-in-out infinite alternate;
@@ -3235,7 +3247,7 @@ html, body {
   top: var(--titlebar-height);
   right: 0;
   bottom: 0;
-  z-index: 20;
+  z-index: 490;
   box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
   transform: translateX(0);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -3821,7 +3833,7 @@ html, body {
   top: var(--titlebar-height);
   right: 0;
   bottom: 0;
-  z-index: 21;
+  z-index: 500;
   box-shadow: -4px 0 20px rgba(0, 0, 0, 0.3);
   transform: translateX(0);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
