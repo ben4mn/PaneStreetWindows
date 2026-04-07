@@ -49,8 +49,15 @@ jobs:
         run: npm run vendor
 
       - name: Fix yanked dependencies
-        working-directory: src-tauri
-        run: cargo update -p window-vibrancy || cargo update
+        shell: bash
+        run: |
+          cd src-tauri
+          echo "=== Before update ==="
+          grep -A3 'name = "window-vibrancy"' Cargo.lock || echo "Not found in lock"
+          cargo update 2>&1 || true
+          echo "=== After update ==="
+          grep -A3 'name = "window-vibrancy"' Cargo.lock || echo "Not found in lock"
+          echo "=== Done ==="
 
       - name: Build Tauri app
         env:
