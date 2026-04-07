@@ -16,6 +16,7 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+      issues: write
 
     steps:
       - uses: actions/checkout@v4
@@ -49,26 +50,15 @@ jobs:
         run: npm run vendor
 
       - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          npx tauri build 2>&1 | tee build.log; EXIT=${PIPESTATUS[0]}
-          if [ $EXIT -ne 0 ]; then
-            ERRORS=$(grep -i "error\|failed\|fatal\|signing" build.log | tail -20)
-            TAIL=$(tail -50 build.log)
-            gh issue create --title "Build failed (exit=$EXIT)" --body "$(printf '```\n%s\n\n=== ERRORS ===\n%s\n```' "$TAIL" "$ERRORS")" || true
-            exit $EXIT
-          fi
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: PaneStreet ${{ github.event.inputs.tag || github.ref_name }}
-          body: |
+          tagName: ${{ github.event.inputs.tag || github.ref_name }}
+          releaseName: PaneStreet ${{ github.event.inputs.tag || github.ref_name }}
+          releaseBody: |
             ## What's New
 
             - Mac mascot visual redesign (bigger, curved antenna, ears, 4 mouth expressions, broom prop)
@@ -79,41 +69,7 @@ jobs:
             - File path link provider (Ctrl+click paths in terminal)
             - Mascot sidebar snapping (drag mascot to sidebar)
             - Notification panel now properly overlays terminal
-            - TDD test harness
 
             Co-Authored-By: Claude <noreply@anthropic.com>
-          draft: false
+          releaseDraft: false
           prerelease: false
-          files: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/nsis/*.sig
-            src-tauri/target/release/bundle/msi/*.msi
-            src-tauri/target/release/bundle/msi/*.sig
-
-      - name: Upload latest.json
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: pwsh
-        run: |
-          $tag = "${{ github.event.inputs.tag || github.ref_name }}"
-          $version = $tag -replace '^v', ''
-          $nsisDir = "src-tauri/target/release/bundle/nsis"
-          $exeName = Get-ChildItem $nsisDir -Filter "*.exe" | Where-Object { $_.Name -notmatch '\.sig$' } | Select-Object -First 1
-          $sigFile = "$nsisDir/$($exeName.Name).sig"
-          $sig = Get-Content $sigFile -Raw
-          $url = "https://github.com/ben4mn/PaneStreetWindows/releases/download/$tag/$($exeName.Name)"
-          $json = @{
-            version = $version
-            notes = "Update to $tag"
-            pub_date = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
-            platforms = @{
-              "windows-x86_64" = @{
-                signature = $sig.Trim()
-                url = $url
-              }
-            }
-          } | ConvertTo-Json -Depth 5
-          $json | Out-File -FilePath "latest.json" -Encoding utf8
-          Write-Host "latest.json content:"
-          Get-Content latest.json
-          gh release upload $tag latest.json --clobber
