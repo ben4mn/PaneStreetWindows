@@ -48,6 +48,11 @@ jobs:
       - name: Vendor JS dependencies
         run: npm run vendor
 
+      - name: Fix yanked dependencies
+        run: |
+          cd src-tauri
+          cargo update
+
       - name: Build Tauri app
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
