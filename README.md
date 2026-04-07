@@ -27,6 +27,10 @@
 
 ---
 
+> **Upgrade Notice (v0.6.0):** If you're on v0.5.1 or earlier, please [download v0.6.0 manually](https://github.com/ben4mn/PaneStreetWindows/releases/tag/v0.6.0). This is a one-time upgrade — auto-updates are now fully working starting with v0.6.0.
+>
+> **New in v0.6.0:** mascot personality system (speech budget, stare-back, hiccups, command milestones), auto-tile panes (Ctrl+Shift+T), Claude Code hooks integration, file path click-to-open in terminal, mascot sidebar snapping, and 6 new animations.
+
 <p align="center">
   <em>Windows port of <a href="https://github.com/ben4mn/PaneStreet">PaneStreet</a> — the native terminal multiplexer with Claude AI integration.</em>
 </p>
