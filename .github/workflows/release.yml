@@ -16,7 +16,6 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
-      issues: write
 
     steps:
       - uses: actions/checkout@v4
@@ -51,15 +50,17 @@ jobs:
         run: npm run vendor
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npx tauri build
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          tagName: ${{ github.event.inputs.tag || github.ref_name }}
-          releaseName: PaneStreet ${{ github.event.inputs.tag || github.ref_name }}
-          releaseBody: |
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: PaneStreet ${{ github.event.inputs.tag || github.ref_name }}
+          body: |
             ## What's New
 
             - Mac mascot visual redesign (bigger, curved antenna, ears, 4 mouth expressions, broom prop)
@@ -72,5 +73,35 @@ jobs:
             - Notification panel now properly overlays terminal
 
             Co-Authored-By: Claude <noreply@anthropic.com>
-          releaseDraft: false
+          draft: false
           prerelease: false
+          files: |
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/nsis/*.sig
+            src-tauri/target/release/bundle/msi/*.msi
+            src-tauri/target/release/bundle/msi/*.sig
+
+      - name: Upload latest.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag || github.ref_name }}"
+          $version = $tag -replace '^v', ''
+          $nsisDir = "src-tauri\target\release\bundle\nsis"
+          $exeFile = Get-ChildItem $nsisDir -Filter "*.exe" | Where-Object { $_.Name -notmatch '\.sig$' } | Select-Object -First 1
+          $sigContent = Get-Content "$nsisDir\$($exeFile.Name).sig" -Raw
+          $url = "https://github.com/ben4mn/PaneStreetWindows/releases/download/$tag/$($exeFile.Name)"
+          $json = @{
+            version = $version
+            notes = "Update to $tag"
+            pub_date = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = $sigContent.Trim()
+                url = $url
+              }
+            }
+          } | ConvertTo-Json -Depth 5
+          $json | Out-File -FilePath "latest.json" -Encoding utf8
+          gh release upload $tag latest.json --clobber
