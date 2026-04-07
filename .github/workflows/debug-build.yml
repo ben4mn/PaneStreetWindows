@@ -1,9 +1,12 @@
-name: Debug Build 3
+name: Debug Build 4
 on:
   workflow_dispatch:
 jobs:
   debug:
     runs-on: windows-latest
+    permissions:
+      contents: write
+      issues: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,25 +19,21 @@ jobs:
           workspaces: src-tauri
       - run: npm ci
       - run: npm run vendor
-      - name: Build and capture error
+      - name: Build and post error
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        shell: pwsh
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
-          try {
-            npx tauri build 2>&1 | Tee-Object -FilePath build-output.txt
-          } catch {
-            Write-Host "Build failed"
-          }
-          Write-Host "=== LAST 100 LINES ==="
-          Get-Content build-output.txt | Select-Object -Last 100
-          Write-Host "=== ERROR LINES ==="
-          Get-Content build-output.txt | Select-String -Pattern "error|Error|failed|signing|password|invalid|NSIS" | Select-Object -Last 30
-          exit 0
-      - name: Upload build output
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-output
-          path: build-output.txt
-          if-no-files-found: warn
+          npx tauri build 2>&1 | tee build.log || true
+          echo "=== BUILD LOG TAIL ==="
+          tail -80 build.log
+          echo "=== ERROR LINES ==="
+          grep -i "error\|failed\|signing\|password\|invalid\|NSIS\|fatal" build.log | tail -30 || echo "No error lines found"
+          
+          # Post as issue comment
+          BODY=$(tail -80 build.log | head -c 60000)
+          gh issue create --title "Debug: build log output" --body "\`\`\`
+          $BODY
+          \`\`\`" || echo "Could not create issue"
