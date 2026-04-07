@@ -1,4 +1,4 @@
-name: Debug Build 2
+name: Debug Build 3
 on:
   workflow_dispatch:
 jobs:
@@ -16,8 +16,25 @@ jobs:
           workspaces: src-tauri
       - run: npm ci
       - run: npm run vendor
-      - name: Build Tauri with signing
+      - name: Build and capture error
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npx tauri build 2>&1
+        shell: pwsh
+        run: |
+          try {
+            npx tauri build 2>&1 | Tee-Object -FilePath build-output.txt
+          } catch {
+            Write-Host "Build failed"
+          }
+          Write-Host "=== LAST 100 LINES ==="
+          Get-Content build-output.txt | Select-Object -Last 100
+          Write-Host "=== ERROR LINES ==="
+          Get-Content build-output.txt | Select-String -Pattern "error|Error|failed|signing|password|invalid|NSIS" | Select-Object -Last 30
+          exit 0
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: build-output.txt
+          if-no-files-found: warn
