@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag (e.g., v0.6.0)'
+        required: true
+        type: string
 
 jobs:
   build-and-release:
@@ -13,6 +19,14 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Create tag (manual dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git tag ${{ github.event.inputs.tag }}
+          git push origin ${{ github.event.inputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -41,8 +55,19 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: PaneStreet ${{ github.ref_name }}
-          releaseBody: See the commits for details.
+          tagName: ${{ github.event.inputs.tag || github.ref_name }}
+          releaseName: PaneStreet ${{ github.event.inputs.tag || github.ref_name }}
+          releaseBody: |
+            ## What's New in ${{ github.event.inputs.tag || github.ref_name }}
+
+            - 6 new mascot animations (shimmy, antenna-fix, yawn, startled, hiccup, impressed)
+            - Mascot personality system (speech budget, stare-back detection, hiccup scheduling, command milestones)
+            - Auto-tile panes (Ctrl+Shift+T)
+            - Claude Code hooks integration (install/uninstall from Settings)
+            - File path link provider (Ctrl+click paths in terminal)
+            - Mascot sidebar snapping (drag mascot to sidebar)
+            - TDD test harness
+
+            Co-Authored-By: Claude <noreply@anthropic.com>
           releaseDraft: false
           prerelease: false
