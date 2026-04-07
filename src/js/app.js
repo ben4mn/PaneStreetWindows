@@ -475,6 +475,49 @@ function toggleLayoutMode() {
   saveSessionState();
 }
 
+function autoTile() {
+  const grid = document.getElementById('pane-grid');
+  if (!grid) return;
+  const gridRect = grid.getBoundingClientRect();
+  const visible = sessions.filter(s => !s.minimized);
+  const count = visible.length;
+  if (count === 0) return;
+
+  // Switch to freeform mode if in auto
+  if (layoutMode === 'auto') {
+    snapshotCurrentPositions();
+    layoutMode = 'freeform';
+    updateLayoutToggleUI();
+  }
+
+  const cols = Math.ceil(Math.sqrt(count));
+  const rows = Math.ceil(count / cols);
+  const gap = 4;
+  const cellW = gridRect.width / cols;
+  const cellH = gridRect.height / rows;
+
+  visible.forEach((s, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const rect = {
+      x: col * cellW + gap,
+      y: row * cellH + gap,
+      width: cellW - gap * 2,
+      height: cellH - gap * 2,
+    };
+    s.freeformRect = rect;
+    s.pane.style.transition = 'left 0.3s ease, top 0.3s ease, width 0.3s ease, height 0.3s ease';
+    s.pane.style.left = rect.x + 'px';
+    s.pane.style.top = rect.y + 'px';
+    s.pane.style.width = rect.width + 'px';
+    s.pane.style.height = rect.height + 'px';
+    setTimeout(() => { s.pane.style.transition = ''; }, 350);
+  });
+
+  setTimeout(() => fitVisibleTerminals(), 350);
+  saveSessionState();
+}
+
 function toggleSnapToGrid() {
   snapToGrid = !snapToGrid;
   updateLayoutToggleUI();
@@ -2090,6 +2133,7 @@ function setupShortcuts() {
     'nav-left':       { key: 'ArrowLeft',  meta: true,  shift: false, alt: true },
     'nav-right':      { key: 'ArrowRight', meta: true,  shift: false, alt: true },
     'reopen-closed':  { key: 'z',       meta: true,  shift: true  },
+    'auto-tile':      { key: 't',       meta: true,  shift: true  },
   };
 
   const ACTIONS = {
@@ -2107,6 +2151,7 @@ function setupShortcuts() {
     'next-pane':      () => { if (isAnyPanelActive()) hidePanel(); focusNextVisible(focusedIndex, 1); return true; },
     'notifications':  () => { toggleNotificationPanel(); return true; },
     'reopen-closed':  () => { reopenLastClosed(); return true; },
+    'auto-tile':      () => { autoTile(); return true; },
     'nav-up':         () => { navigateDirection('up'); return true; },
     'nav-down':       () => { navigateDirection('down'); return true; },
     'nav-left':       () => { navigateDirection('left'); return true; },
@@ -2497,8 +2542,14 @@ const ACTIVITIES = [
   { name: 'bounce',  cls: 'act-bounce',  duration: [3, 5] },
   { name: 'sweep',   cls: 'act-sweep',   duration: [8, 14],  speech: 'Tidying up...' },
   { name: 'phone',   cls: 'act-phone',   duration: [10, 20], speech: 'Mhm... mhm...' },
-  { name: 'code',    cls: 'act-code',    duration: [12, 22], speech: 'Coding...' },
+  { name: 'code',    cls: 'act-code',    duration: [12, 22], speech: "Don't mind me." },
   { name: 'mop',     cls: 'act-mop',     duration: [8, 14] },
+  { name: 'shimmy',  cls: 'act-shimmy',  duration: [3, 5] },
+  { name: 'antennaFix', cls: 'act-antenna-fix', duration: [2, 3] },
+  { name: 'yawn',    cls: 'act-yawn',    duration: [6, 10] },
+  { name: 'startled', cls: 'act-startled', duration: [3, 5] },
+  { name: 'hiccup',  cls: 'act-hiccup',  duration: [2, 4] },
+  { name: 'impressed', cls: 'act-impressed', duration: [4, 7], speech: 'Nice!' },
 ];
 
 const APP_TIPS = [
@@ -2571,6 +2622,192 @@ const BOREDOM_WALK_QUIPS = ['Right. Going for a walk.', 'Stretching my legs.', '
 
 // Theme reaction cooldown
 let themeReactionCooldown = 0;
+
+// --- Speech Budget System ---
+const SPEECH_BUDGET_WINDOW = 5 * 60 * 1000; // 5 minutes
+let speechTimestamps = [];
+let robotSpecialActive = false;
+
+function getSpeechBudget() {
+  const freq = localStorage.getItem('ps-robot-frequency') || 'medium';
+  return { low: 2, medium: 4, high: 8 }[freq] || 4;
+}
+
+function withinSpeechBudget() {
+  const now = Date.now();
+  speechTimestamps = speechTimestamps.filter(t => now - t < SPEECH_BUDGET_WINDOW);
+  return speechTimestamps.length < getSpeechBudget();
+}
+
+function recordSpeech() {
+  speechTimestamps.push(Date.now());
+}
+
+// --- Stare-back detection ---
+let staredBackCooldown = 0;
+
+function setupCaughtWatching() {
+  let hoverTimer = null;
+  const overlay = document.getElementById('robot-overlay');
+  overlay?.addEventListener('mousemove', (e) => {
+    if (!robotEl) return;
+    const rect = robotEl.getBoundingClientRect();
+    const inZone = Math.abs(e.clientX - (rect.left + rect.width / 2)) < 40 &&
+                   Math.abs(e.clientY - (rect.top + rect.height / 2)) < 50;
+    if (inZone) {
+      if (!hoverTimer) hoverTimer = setTimeout(() => {
+        hoverTimer = null;
+        if (Date.now() - staredBackCooldown < 5 * 60000) return;
+        if (robotOverride || robotSpecialActive) return;
+        staredBackCooldown = Date.now();
+        const qs = ['I see you.', 'Something I can help with?', '...hi.', 'I can feel you staring.'];
+        showSpeech(qs[Math.floor(Math.random() * qs.length)], 3000, true);
+        robotEl.classList.add('act-look');
+        setTimeout(() => robotEl.classList.remove('act-look'), 3000);
+      }, 5000);
+    } else {
+      clearTimeout(hoverTimer);
+      hoverTimer = null;
+    }
+  });
+}
+
+// --- Hiccup scheduling ---
+let hiccupTimer = null;
+
+function robotHiccup() {
+  if (!robotEl || robotOverride || robotSpecialActive) return;
+  if (['act-sleep', 'act-code', 'act-type'].some(c => robotEl.classList.contains(c))) return;
+  robotEl.classList.add('act-hiccup');
+  setTimeout(() => robotEl.classList.remove('act-hiccup'), 350);
+}
+
+function scheduleHiccup() {
+  const delay = (20 + Math.random() * 30) * 60000; // 20-50 minutes
+  hiccupTimer = setTimeout(() => {
+    if (localStorage.getItem('ps-robot-enabled') !== 'false') robotHiccup();
+    scheduleHiccup();
+  }, delay);
+}
+
+// --- Output velocity tracking ---
+let outputByteCount = 0;
+let outputVelocityTimer = null;
+
+function trackOutputVelocity(byteLength) {
+  outputByteCount += byteLength;
+}
+
+function startOutputVelocityCheck() {
+  if (outputVelocityTimer) return;
+  outputVelocityTimer = setInterval(() => {
+    if (robotEl && outputByteCount > 8000 && !robotEl.classList.contains('act-impressed')) {
+      robotEl.classList.add('act-impressed');
+      if (withinSpeechBudget()) {
+        const msgs = ['Whoa.', 'That\'s a lot of output.', 'Impressive.', 'Go go go!'];
+        showSpeech(msgs[Math.floor(Math.random() * msgs.length)], 2000, true);
+      }
+      setTimeout(() => robotEl.classList.remove('act-impressed'), 2000);
+    }
+    outputByteCount = 0;
+  }, 500);
+}
+
+// --- Command milestone counting ---
+let commandMilestoneCount = parseInt(localStorage.getItem('ps-command-count') || '0');
+const COMMAND_MILESTONES = [100, 500, 1000, 2500, 5000];
+const MILESTONE_MESSAGES = {
+  100: 'First 100 commands. Not bad!',
+  500: '500 commands. Getting serious.',
+  1000: '1,000 commands. Power user.',
+  2500: '2,500 commands. Legendary.',
+  5000: '5,000 commands. Is this even real?',
+};
+
+function incrementCommandCount() {
+  commandMilestoneCount++;
+  localStorage.setItem('ps-command-count', String(commandMilestoneCount));
+  if (COMMAND_MILESTONES.includes(commandMilestoneCount) && robotEl) {
+    clearTimeout(robotTimer);
+    robotClearActivity();
+    robotEl.classList.add('act-dance');
+    showSpeech(MILESTONE_MESSAGES[commandMilestoneCount], 5000, true);
+    robotTimer = setTimeout(() => { robotClearActivity(); robotNext(); }, 5000);
+  }
+}
+
+// --- Long working session timer ---
+const sessionStartTime = Date.now();
+let longSessionNotified = false;
+
+function checkLongSession() {
+  if (longSessionNotified) return;
+  const elapsed = Date.now() - sessionStartTime;
+  if (elapsed > 2 * 60 * 60 * 1000) { // 2 hours
+    longSessionNotified = true;
+    if (robotEl && localStorage.getItem('ps-robot-enabled') !== 'false') {
+      const msgs = ['You\'ve been at this for 2 hours. Take a break.', 'Marathon session. Stay hydrated.', 'Still going strong after 2 hours.'];
+      showSpeech(msgs[Math.floor(Math.random() * msgs.length)], 5000, true);
+    }
+  }
+}
+
+// --- Sidebar mascot snapping ---
+let robotLocation = localStorage.getItem('ps-robot-location') || 'footer';
+
+const SIDEBAR_ENTRY_QUOTES = [
+  'Ok ok, I\'ll stand over here.', 'Sorry if I was in the way.',
+  'New office, same me.', 'Sidebar life, let\'s go.',
+  'I can watch the sessions from here.', 'Cozy corner.',
+];
+
+const SIDEBAR_EXIT_QUOTES = [
+  'Back to my usual spot.', 'Miss me?',
+  'Footer sweet footer.', 'The view is better down here.',
+  'I was getting claustrophobic.', 'Room to stretch.',
+];
+
+function moveRobotTo(location, showQuote = true) {
+  if (location === robotLocation) return;
+  clearTimeout(robotTimer);
+  robotClearActivity();
+
+  const overlay = document.getElementById('robot-overlay');
+  const slot = document.getElementById('sidebar-mascot-slot');
+  if (!overlay || !robotEl) return;
+
+  if (location === 'sidebar') {
+    if (slot) {
+      slot.appendChild(robotEl);
+      robotEl.style.transition = 'none';
+      robotEl.style.left = '50%';
+      robotEl.style.transform = 'translateX(-50%)';
+      robotEl.style.bottom = '0px';
+      robotEl.style.top = '';
+    }
+    if (showQuote) {
+      const q = SIDEBAR_ENTRY_QUOTES[Math.floor(Math.random() * SIDEBAR_ENTRY_QUOTES.length)];
+      setTimeout(() => showSpeech(q, 3000, true), 400);
+    }
+  } else {
+    overlay.appendChild(robotEl);
+    robotEl.style.transition = 'none';
+    robotEl.style.top = '';
+    robotEl.style.transform = '';
+    robotEl.style.bottom = '0px';
+    const ow = overlay.clientWidth;
+    robotEl.style.left = Math.floor(4 + Math.random() * Math.max(100, ow - 80)) + 'px';
+    if (showQuote) {
+      const q = SIDEBAR_EXIT_QUOTES[Math.floor(Math.random() * SIDEBAR_EXIT_QUOTES.length)];
+      setTimeout(() => showSpeech(q, 3000, true), 400);
+    }
+  }
+
+  robotLocation = location;
+  localStorage.setItem('ps-robot-location', location);
+  void robotEl.offsetLeft;
+  if (!robotOverride) robotNext();
+}
 
 function getFrequency() {
   return FREQUENCY_SETTINGS[localStorage.getItem('ps-robot-frequency') || 'medium'];
@@ -2680,12 +2917,36 @@ function robotInit() {
     'That was fun!', 'Do NOT do that again.', 'I think I left my stomach up there.',
   ];
 
-  document.addEventListener('mouseup', () => {
+  document.addEventListener('mouseup', (e) => {
     if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
     if (!isDragging) return;
     isDragging = false;
     robotEl.classList.remove('dragging');
     touchInteraction();
+
+    // Check if dropped over sidebar — snap to sidebar
+    if (hasDragged && robotLocation !== 'sidebar') {
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar) {
+        const sr = sidebar.getBoundingClientRect();
+        if (e.clientX < sr.right + 20) {
+          moveRobotTo('sidebar');
+          return;
+        }
+      }
+    }
+    // If in sidebar and dragged away from it, move back to footer
+    if (hasDragged && robotLocation === 'sidebar') {
+      const sidebar = document.getElementById('sidebar');
+      if (sidebar) {
+        const sr = sidebar.getBoundingClientRect();
+        if (e.clientX > sr.right + 20) {
+          moveRobotTo('footer');
+          return;
+        }
+      }
+    }
+
     const currentBottom = parseInt(robotEl.style.bottom) || 0;
     if (currentBottom > 20) {
       // Falling! Wave arms and speak
@@ -2846,6 +3107,33 @@ function robotInit() {
     setTimeout(() => showSpeech(msgs[Math.floor(Math.random() * msgs.length)], 3000), 500);
   });
 
+  // Window focus / blur — caught-watching mechanic
+  // (extends the existing blur/focus handler)
+  let caughtWatchingBlurTime = null;
+  window.addEventListener('blur', () => { caughtWatchingBlurTime = Date.now(); });
+  window.addEventListener('focus', () => {
+    if (!caughtWatchingBlurTime) return;
+    const away = Date.now() - caughtWatchingBlurTime;
+    caughtWatchingBlurTime = null;
+    if (away > 2 * 60 * 1000 && Math.random() < 0.12 && robotEl && localStorage.getItem('ps-robot-enabled') !== 'false') {
+      const msgs = ['Were you watching me?', 'I saw you leave.', 'Don\'t think I didn\'t notice.', 'I was doing important things while you were gone.'];
+      setTimeout(() => showSpeech(msgs[Math.floor(Math.random() * msgs.length)], 3500, true), 800);
+    }
+  });
+
+  // Initialize personality subsystems
+  setupCaughtWatching();
+  scheduleHiccup();
+  startOutputVelocityCheck();
+
+  // Long session check every 10 minutes
+  setInterval(checkLongSession, 10 * 60 * 1000);
+
+  // Restore sidebar location if saved
+  if (robotLocation === 'sidebar') {
+    moveRobotTo('sidebar', false);
+  }
+
   // Just stand still on startup — the idle hover animation handles the rest
   // First real action after a long pause
   robotNext();
@@ -2993,7 +3281,7 @@ function robotDoActivity() {
 
 function robotClearActivity() {
   if (!robotEl) return;
-  robotEl.classList.remove('walking', 'face-left', 'walk-anticipate', 'walk-arrive', 'dragging', 'act-falling');
+  robotEl.classList.remove('walking', 'face-left', 'walk-anticipate', 'walk-arrive', 'dragging', 'act-falling', 'act-impressed', 'act-hiccup', 'waiting');
   for (const act of ACTIVITIES) {
     robotEl.classList.remove(act.cls);
   }
@@ -3090,7 +3378,9 @@ function triggerMascotBounce() {
   // no-op now, status changes handled by updateMascot
 }
 
-function showSpeech(text, duration = 3000) {
+function showSpeech(text, duration = 3000, force = false) {
+  if (!force && !withinSpeechBudget()) return;
+  recordSpeech();
   const el = document.getElementById('mascot-speech');
   if (!el) return;
   el.textContent = text;

@@ -73,6 +73,9 @@ export class TerminalSession {
       }
     }));
 
+    // File path link provider — Ctrl+Click (Cmd+Click) to open local file paths
+    this._registerFileLinkProvider();
+
     // Search addon for find-in-terminal
     this.searchAddon = new SearchAddon();
     this.term.loadAddon(this.searchAddon);
@@ -276,6 +279,48 @@ export class TerminalSession {
     try {
       this.fitAddon.fit();
     } catch (_) {}
+  }
+
+  _registerFileLinkProvider() {
+    const filePathRegex = /(?:^|\s)((?:\/[\w.@\-]+)+(?:\.[\w]+)?(?::(\d+)(?::(\d+))?)?)/g;
+    // Also match Windows paths like C:\Users\foo\file.js:10
+    const winPathRegex = /(?:^|\s)((?:[A-Z]:\\[\w.@\-\\]+)+(?:\.[\w]+)?(?::(\d+)(?::(\d+))?)?)/g;
+
+    this.term.registerLinkProvider({
+      provideLinks: (lineNumber, callback) => {
+        const line = this.term.buffer.active.getLine(lineNumber - 1);
+        if (!line) return callback([]);
+        const text = line.translateToString(true);
+        const links = [];
+
+        for (const regex of [filePathRegex, winPathRegex]) {
+          let match;
+          const re = new RegExp(regex.source, 'g');
+          while ((match = re.exec(text)) !== null) {
+            const fullMatch = match[1];
+            const startX = match.index + (match[0].length - match[1].length) + 1;
+            links.push({
+              range: {
+                start: { x: startX, y: lineNumber },
+                end: { x: startX + fullMatch.length - 1, y: lineNumber },
+              },
+              text: fullMatch,
+              activate: (event, linkText) => {
+                if (_mod(event)) {
+                  const filePath = linkText.replace(/:\d+(:\d+)?$/, '');
+                  try {
+                    window.__TAURI__.opener.openPath(filePath);
+                  } catch (err) {
+                    console.warn('Failed to open path:', err);
+                  }
+                }
+              },
+            });
+          }
+        }
+        callback(links);
+      },
+    });
   }
 
   updateTheme(themeColors) {

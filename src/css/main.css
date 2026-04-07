@@ -1130,6 +1130,35 @@ html, body {
   display: none;
 }
 
+/* Mascot in sidebar slot */
+#sidebar-mascot-slot {
+  position: relative;
+  min-height: 0;
+  overflow: visible;
+}
+#sidebar-mascot-slot #footer-mascot {
+  position: relative;
+  bottom: auto;
+  left: auto;
+  transform: scale(0.8);
+  transform-origin: center bottom;
+  cursor: grab;
+}
+#sidebar-mascot-slot .mascot-speech {
+  font-size: 10px;
+  white-space: nowrap;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 100%;
+}
+
+/* in-sidebar utility class */
+#robot-overlay.in-sidebar {
+  position: static;
+  height: auto;
+  pointer-events: auto;
+}
+
 /* Pause all mascot animations when app is hidden to save CPU/GPU */
 .app-hidden #footer-mascot,
 .app-hidden #footer-mascot * {
@@ -1630,6 +1659,161 @@ html, body {
 @keyframes mop-leg-r {
   0%, 100% { transform: translateX(0.5px); }
   50% { transform: translateX(-0.5px); }
+}
+
+/* Shimmy — side-to-side body wiggle with happy eyes */
+#footer-mascot.act-shimmy .robot-body {
+  animation: shimmy-body 0.5s ease-in-out infinite;
+  transform-origin: center bottom;
+}
+#footer-mascot.act-shimmy .robot-arm-l {
+  animation: shimmy-arm-l 0.5s ease-in-out infinite;
+  transform-origin: 6.5px 21px;
+}
+#footer-mascot.act-shimmy .robot-arm-r {
+  animation: shimmy-arm-r 0.5s ease-in-out infinite;
+  transform-origin: 21.5px 21px;
+}
+#footer-mascot.act-shimmy .robot-eye-l,
+#footer-mascot.act-shimmy .robot-eye-r {
+  animation: happy-squint 0.5s ease-in-out infinite alternate;
+}
+@keyframes shimmy-body {
+  0%, 100% { transform: translateX(-1.5px) rotate(-1.5deg); }
+  50% { transform: translateX(1.5px) rotate(1.5deg); }
+}
+@keyframes shimmy-arm-l {
+  0%, 100% { transform: rotate(-8deg); }
+  50% { transform: rotate(8deg); }
+}
+@keyframes shimmy-arm-r {
+  0%, 100% { transform: rotate(8deg); }
+  50% { transform: rotate(-8deg); }
+}
+@keyframes happy-squint {
+  0% { transform: scaleY(0.22); }
+  100% { transform: scaleY(0.32); }
+}
+
+/* Antenna fix — reaching up to adjust antenna */
+#footer-mascot.act-antenna-fix .robot-arm-r {
+  animation: antenna-fix-arm 0.6s ease-in-out;
+  transform-origin: 21.5px 21px;
+}
+#footer-mascot.act-antenna-fix .robot-antenna {
+  animation: antenna-fix-spring 0.6s ease-in-out;
+  transform-origin: 18px 6.5px;
+}
+@keyframes antenna-fix-arm {
+  0% { transform: rotate(0deg); }
+  30% { transform: rotate(-30deg) translateY(-3px); }
+  70% { transform: rotate(-25deg) translateY(-3px); }
+  100% { transform: rotate(0deg); }
+}
+@keyframes antenna-fix-spring {
+  0% { transform: rotate(0deg); }
+  30% { transform: rotate(-12deg); }
+  60% { transform: rotate(8deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* Yawn — eyes close, mouth opens, body sways */
+#footer-mascot.act-yawn .robot-eye-l,
+#footer-mascot.act-yawn .robot-eye-r {
+  animation: yawn-eyes 2s ease-in-out forwards;
+}
+#footer-mascot.act-yawn .robot-mouth-smile {
+  animation: yawn-mouth-fade 2s ease-in-out forwards;
+}
+#footer-mascot.act-yawn .robot-mouth-open {
+  animation: yawn-mouth-open 2s ease-in-out forwards;
+}
+#footer-mascot.act-yawn .robot-body {
+  animation: yawn-body 2s ease-in-out forwards;
+  transform-origin: center bottom;
+}
+@keyframes yawn-eyes {
+  0% { transform: scaleY(1); }
+  30%, 70% { transform: scaleY(0.05); }
+  100% { transform: scaleY(0.05); }
+}
+@keyframes yawn-mouth-fade {
+  0%, 20% { opacity: 1; }
+  30%, 80% { opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes yawn-mouth-open {
+  0%, 20% { opacity: 0; transform: scaleY(0.3); }
+  35%, 70% { opacity: 1; transform: scaleY(1); }
+  85% { opacity: 0; transform: scaleY(0.3); }
+  100% { opacity: 0; }
+}
+@keyframes yawn-body {
+  0% { transform: rotate(0deg); }
+  30%, 70% { transform: rotate(-2deg) translateY(1px); }
+  100% { transform: rotate(0deg); }
+}
+
+/* Startled — jump back with wide eyes */
+#footer-mascot.act-startled .robot-body {
+  animation: startled-body 0.6s ease-out;
+  transform-origin: center bottom;
+}
+#footer-mascot.act-startled .robot-antenna {
+  animation: startled-antenna 0.6s ease-out;
+  transform-origin: 18px 6.5px;
+}
+#footer-mascot.act-startled .robot-eye-l,
+#footer-mascot.act-startled .robot-eye-r {
+  animation: panic-wide 0.15s ease-in-out infinite alternate;
+}
+@keyframes startled-body {
+  0% { transform: translateY(0) scale(1); }
+  15% { transform: translateY(-5px) scale(1.04); }
+  40% { transform: translateY(-2px) scale(1.01); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes startled-antenna {
+  0% { transform: rotate(0deg); }
+  15% { transform: rotate(-25deg); }
+  40% { transform: rotate(15deg); }
+  100% { transform: rotate(0deg); }
+}
+@keyframes panic-wide {
+  0% { transform: scaleY(1.1); }
+  100% { transform: scaleY(1.5); }
+}
+
+/* Hiccup — body jolts with antenna flutter */
+#footer-mascot.act-hiccup .robot-body {
+  animation: hiccup-body 0.35s ease-out;
+  transform-origin: center bottom;
+}
+#footer-mascot.act-hiccup .robot-antenna {
+  animation: hiccup-antenna 0.35s ease-out;
+  transform-origin: 18px 6.5px;
+}
+@keyframes hiccup-body {
+  0% { transform: translateY(0); }
+  20% { transform: translateY(-4px) rotate(1.5deg); }
+  50% { transform: translateY(-2px) rotate(-1deg); }
+  100% { transform: translateY(0) rotate(0); }
+}
+@keyframes hiccup-antenna {
+  0% { transform: rotate(0deg); }
+  20% { transform: rotate(-15deg); }
+  60% { transform: rotate(10deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* Impressed — wide-eyed reaction */
+#footer-mascot.act-impressed .robot-eye-l,
+#footer-mascot.act-impressed .robot-eye-r {
+  animation: impressed-eyes 2s ease-out forwards;
+}
+@keyframes impressed-eyes {
+  0%, 10% { transform: scaleY(1.35); }
+  100% { transform: scaleY(1); }
 }
 
 /* --- Status overrides (applied by JS alongside activity) --- */

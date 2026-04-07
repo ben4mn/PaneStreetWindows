@@ -456,6 +456,22 @@ async function renderSettingsTab(tab) {
         </div>
       </div>
 
+      <div class="settings-section">
+        <h3>Claude Code Integration</h3>
+        <div class="settings-section-body">
+          <div class="setting-row-inline">
+            <div>
+              <div class="setting-label">Claude Code hooks</div>
+              <div class="setting-description">Install hooks into Claude Code to receive notifications when tasks complete, need input, or finish</div>
+            </div>
+            <label class="setting-switch">
+              <input type="checkbox" id="pref-hooks" />
+              <span class="setting-switch-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
       <button class="settings-save-btn" id="general-save">Save &amp; Apply</button>
       <span class="settings-save-msg" id="general-msg"></span>
     `;
@@ -493,6 +509,21 @@ async function renderSettingsTab(tab) {
         shellSelect.appendChild(opt);
       }
     });
+
+    // Claude Code hooks toggle
+    const hooksToggle = container.querySelector('#pref-hooks');
+    if (hooksToggle) {
+      invoke('check_hooks_installed').then(installed => {
+        hooksToggle.checked = installed;
+      }).catch(() => {});
+      hooksToggle.addEventListener('change', () => {
+        const cmd = hooksToggle.checked ? 'install_claude_hooks' : 'uninstall_claude_hooks';
+        invoke(cmd).catch(err => {
+          console.warn('Hook toggle failed:', err);
+          hooksToggle.checked = !hooksToggle.checked;
+        });
+      });
+    }
 
     // Git poll interval range
     const gitPollEl = container.querySelector('#pref-git-poll');
@@ -888,6 +919,7 @@ const DEFAULT_SHORTCUTS = [
   { id: 'layout-mode',      label: 'Toggle grid / free-form',      key: 'g',       meta: true,  shift: true,  category: 'Windows' },
   { id: 'prev-pane',        label: 'Previous pane',                key: '[',       meta: true,  shift: true,  category: 'Windows' },
   { id: 'next-pane',        label: 'Next pane',                    key: ']',       meta: true,  shift: true,  category: 'Windows' },
+  { id: 'auto-tile',        label: 'Auto-tile panes',             key: 't',       meta: true,  shift: true,  category: 'Windows' },
 ];
 
 function loadShortcuts() {
