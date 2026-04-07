@@ -50,10 +50,20 @@ jobs:
         run: npm run vendor
 
       - name: Build Tauri app
+        id: build
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npx tauri build
+        shell: pwsh
+        run: |
+          $output = npx tauri build 2>&1
+          $exitCode = $LASTEXITCODE
+          $output | Select-Object -Last 100 | Write-Host
+          if ($exitCode -ne 0) {
+            $errorLines = $output | Select-String -Pattern "error|Error|failed|signing" | Select-Object -Last 20
+            Write-Host "::error::BUILD FAILED (exit=$exitCode): $($errorLines -join ' | ')"
+            exit $exitCode
+          }
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
