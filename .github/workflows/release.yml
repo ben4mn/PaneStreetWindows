@@ -42,12 +42,17 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+          shared-key: release-v2
 
       - name: Install frontend dependencies
         run: npm ci
 
       - name: Vendor JS dependencies
         run: npm run vendor
+
+      - name: Fix yanked crate
+        shell: bash
+        run: cd src-tauri && cargo update -p window-vibrancy 2>&1 || cargo generate-lockfile 2>&1 || true
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
