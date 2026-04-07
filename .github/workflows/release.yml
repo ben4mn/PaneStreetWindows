@@ -48,22 +48,16 @@ jobs:
       - name: Vendor JS dependencies
         run: npm run vendor
 
-      - name: Fix yanked dependencies
-        shell: bash
-        run: |
-          cd src-tauri
-          echo "=== Before update ==="
-          grep -A3 'name = "window-vibrancy"' Cargo.lock || echo "Not found in lock"
-          cargo update 2>&1 || true
-          echo "=== After update ==="
-          grep -A3 'name = "window-vibrancy"' Cargo.lock || echo "Not found in lock"
-          echo "=== Done ==="
-
-      - name: Build Tauri app
+      - name: Fix yanked dependencies and build
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npx tauri build
+        shell: bash
+        run: |
+          cd src-tauri
+          cargo update
+          cd ..
+          npx tauri build
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
