@@ -29,7 +29,7 @@
 
 > **Upgrade Notice (v0.6.0):** If you're on v0.5.1 or earlier, please [download v0.6.0 manually](https://github.com/ben4mn/PaneStreetWindows/releases/tag/v0.6.0). This is a one-time upgrade — auto-updates are now fully working starting with v0.6.0.
 >
-> **New in v0.6.0:** mascot personality system (speech budget, stare-back, hiccups, command milestones), auto-tile panes (Ctrl+Shift+T), Claude Code hooks integration, file path click-to-open in terminal, mascot sidebar snapping, and 6 new animations.
+> **New in v0.6.3:** Find in Terminal button (⌕), Command Palette (Ctrl+P), and Broadcast Input (⊕) — mirror keystrokes across multiple panes simultaneously.
 
 <p align="center">
   <em>Windows port of <a href="https://github.com/ben4mn/PaneStreet">PaneStreet</a> — the native terminal multiplexer with Claude AI integration.</em>
@@ -42,6 +42,17 @@ Terminal multiplexers like tmux are powerful but stuck in the 80s. PaneStreet br
 No config files. No arcane keybindings to memorize. Just open it and start working.
 
 ## Features
+
+### Find in Terminal
+Press `Ctrl+Shift+F` or click the **⌕** button in any pane header to open an inline search bar. Type to jump to matches, use ▲/▼ (or `Shift+Enter` / `Enter`) to step through results, and press `Escape` to close. Match count is shown next to the input.
+
+### Command Palette
+Press `Ctrl+P` to open the command palette — a fuzzy-search overlay listing every available action and all open sessions. Start typing to filter, navigate with `↑`/`↓`, press `Enter` to execute, or `Escape` to dismiss. The shortcut can be rebound in **Settings → Keys**.
+
+### Broadcast Input
+Click the **⊕** button in a pane header to enable broadcast mode for that pane. Enable it on two or more panes and every keystroke you type is mirrored to all broadcast-enabled panes simultaneously. The button turns accent-colored when active; click again to disable. Useful for running the same command across multiple repositories, environments, or shells at once.
+
+---
 
 ### Terminal Management
 - **Multi-pane layouts** — Auto-grid, freeform drag-and-drop, or edge-snap split modes
@@ -136,6 +147,8 @@ All shortcuts are rebindable in **Settings > Keyboard Shortcuts**.
 | Settings | `Ctrl ,` |
 | Toggle Sidebar | `Ctrl B` |
 | File Browser | `Ctrl Shift E` |
+| **Command Palette** | **`Ctrl P`** |
+| **Find in Terminal** | **`Ctrl Shift F`** |
 | Maximize Pane | `Ctrl Shift Enter` |
 | Minimize Pane | `Ctrl M` |
 | Restore All | `Ctrl Shift M` |

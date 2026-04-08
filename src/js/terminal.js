@@ -80,6 +80,9 @@ export class TerminalSession {
     this.searchAddon = new SearchAddon();
     this.term.loadAddon(this.searchAddon);
 
+    // Broadcast input hook — set by app.js to mirror keystrokes to other panes
+    this.onInputCallback = null;
+
     // Intercept Shift+Enter BEFORE xterm processes it.
     // Uses platform-specific encoding via send_shift_enter command:
     // - Unix: Kitty CSI u sequence (\x1b[13;2u)
@@ -132,6 +135,11 @@ export class TerminalSession {
       // Mod+Shift+F: find in terminal
       if (e.type === 'keydown' && e.key === 'F' && _mod(e) && e.shiftKey && !e.altKey) {
         self.toggleSearchBar();
+        return false;
+      }
+      // Mod+P: command palette — prevent PTY from receiving it (e.g. readline history in Git Bash)
+      // and let the event bubble to the document-level shortcut handler.
+      if (e.type === 'keydown' && e.key === 'p' && _mod(e) && !e.shiftKey && !e.altKey) {
         return false;
       }
       // Escape: close search bar if open
@@ -339,15 +347,16 @@ export class TerminalSession {
   }
 
   async connect(cwd, sessionId = null) {
+    // Captured here so both channel.onmessage and flushInput closures share the same reference.
+    const self = this;
     const channel = new Channel();
     channel.onmessage = (msg) => {
       const bytes = new Uint8Array(msg.data);
       // Write to terminal first — this is the latency-critical path
-      this.term.write(bytes);
+      self.term.write(bytes);
 
       // Defer output scanning to avoid blocking the render
-      if (this.onOutputCallback) {
-        const self = this;
+      if (self.onOutputCallback) {
         requestAnimationFrame(() => {
           try {
             const text = _decoder.decode(bytes, { stream: true });
@@ -382,6 +391,8 @@ export class TerminalSession {
       const combined = inputQueue.join('');
       inputQueue.length = 0;
       const bytes = _encoder.encode(combined);
+      // Notify broadcast hook before sending to own PTY
+      if (self.onInputCallback) self.onInputCallback(combined);
       invoke('write_to_pty', { sessionId: sid, data: Array.from(bytes) });
     };
 
