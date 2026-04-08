@@ -1,5 +1,5 @@
 import { TerminalSession } from './terminal.js';
-import { togglePanel, hidePanel, isAnyPanelActive, setOnHide, loadSavedTheme, setFocusedCwd } from './config-panels.js';
+import { togglePanel, hidePanel, isAnyPanelActive, setOnHide, loadSavedTheme, setFocusedCwd, loadShortcuts, formatShortcut } from './config-panels.js';
 import { initFileViewer, toggleFileViewer, updateFileViewerCwd, hideFileViewer, isFileViewerVisible, refreshDiffStats } from './file-viewer.js';
 
 const { invoke } = window.__TAURI__.core;
@@ -1013,6 +1013,30 @@ function createPane(name) {
     if (idx >= 0) toggleMaximize(idx);
   });
 
+  const searchBtn = document.createElement('button');
+  searchBtn.className = 'pane-btn pane-search-btn';
+  searchBtn.innerHTML = '&#x2315;'; // ⌕ search symbol
+  searchBtn.title = `Find in terminal (${modShiftSymbol}F)`;
+  searchBtn.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+  });
+  // Wired after session object is created (see createSession)
+  searchBtn._pane = pane;
+
+  const broadcastBtn = document.createElement('button');
+  broadcastBtn.className = 'pane-btn pane-broadcast-btn';
+  broadcastBtn.innerHTML = '&#x2295;'; // ⊕ broadcast symbol
+  broadcastBtn.title = 'Broadcast input (off)';
+  broadcastBtn.dataset.active = 'false';
+  broadcastBtn.addEventListener('mousedown', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+  });
+  broadcastBtn._pane = pane;
+
+  controls.appendChild(searchBtn);
+  controls.appendChild(broadcastBtn);
   controls.appendChild(minimizeBtn);
   controls.appendChild(maximizeBtn);
   controls.appendChild(closeBtn);
@@ -1105,8 +1129,39 @@ async function createSession(restoreCwd, restoreScrollback) {
     pane,
     statusDot,
     minimized: false,
+    broadcast: false,
     cwd: effectiveCwd || null,
     freeformRect: null,
+  };
+
+  // Wire search button now that session exists
+  const searchBtnEl = pane.querySelector('.pane-search-btn');
+  if (searchBtnEl) {
+    searchBtnEl.addEventListener('click', () => session.terminal.toggleSearchBar());
+  }
+
+  // Wire broadcast button
+  const broadcastBtnEl = pane.querySelector('.pane-broadcast-btn');
+  if (broadcastBtnEl) {
+    broadcastBtnEl.addEventListener('click', () => {
+      session.broadcast = !session.broadcast;
+      broadcastBtnEl.dataset.active = String(session.broadcast);
+      broadcastBtnEl.title = session.broadcast
+        ? 'Broadcasting ON — click to disable'
+        : 'Broadcast input (off)';
+    });
+  }
+
+  // Broadcast hook: when this session has broadcast enabled, mirror input to other broadcast panes
+  const _broadcastEncoder = new TextEncoder();
+  terminal.onInputCallback = (data) => {
+    if (!session.broadcast) return;
+    const bytes = _broadcastEncoder.encode(data);
+    sessions.forEach(s => {
+      if (s !== session && s.broadcast && s.id && !s.minimized) {
+        invoke('write_to_pty', { sessionId: s.id, data: Array.from(bytes) });
+      }
+    });
   };
 
   // Refit terminal whenever the pane body actually changes size (e.g. grid gutter drags)
@@ -2113,6 +2168,157 @@ function matchesShortcut(e, id, bindings) {
   return keyLower === b.key && modActive(e) === b.meta && e.shiftKey === b.shift;
 }
 
+// --- Command Palette ---
+
+function openCommandPalette() {
+  const overlay = document.getElementById('command-palette-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('hidden');
+  const input = document.getElementById('palette-input');
+  input.value = '';
+  _renderPaletteResults('');
+  input.focus();
+}
+
+function closeCommandPalette() {
+  const overlay = document.getElementById('command-palette-overlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+function _renderPaletteResults(query) {
+  const resultsEl = document.getElementById('palette-results');
+  if (!resultsEl) return;
+
+  const q = query.toLowerCase().trim();
+
+  // Build action items from DEFAULT_SHORTCUTS
+  const shortcuts = loadShortcuts();
+  const actionItems = shortcuts
+    .filter(s => s.id !== 'focus-1') // Skip "Focus 1-9" placeholder
+    .map(s => ({
+      id: s.id,
+      label: s.label,
+      shortcut: formatShortcut(s),
+      category: s.category,
+      type: 'action',
+    }));
+
+  // Build session items
+  const sessionItems = sessions.map((s, i) => ({
+    id: `session-${i}`,
+    label: s.name || `Terminal ${i + 1}`,
+    shortcut: i < 9 ? `Ctrl+${i + 1}` : '',
+    category: 'Sessions',
+    type: 'session',
+    index: i,
+  }));
+
+  const allItems = [...actionItems, ...sessionItems];
+  const filtered = q
+    ? allItems.filter(item => item.label.toLowerCase().includes(q) || item.category.toLowerCase().includes(q))
+    : allItems;
+
+  if (filtered.length === 0) {
+    resultsEl.innerHTML = '<div class="palette-empty">No results</div>';
+    return;
+  }
+
+  // Group by category
+  const groups = {};
+  filtered.forEach(item => {
+    if (!groups[item.category]) groups[item.category] = [];
+    groups[item.category].push(item);
+  });
+
+  resultsEl.innerHTML = '';
+  let firstItem = true;
+  Object.entries(groups).forEach(([category, items]) => {
+    const header = document.createElement('div');
+    header.className = 'palette-section-header';
+    header.textContent = category;
+    resultsEl.appendChild(header);
+
+    items.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'palette-item' + (firstItem ? ' active' : '');
+      el.dataset.id = item.id;
+      el.dataset.type = item.type;
+      if (item.type === 'session') el.dataset.index = item.index;
+      el.innerHTML = `<span class="palette-item-label">${item.label}</span>${item.shortcut ? `<span class="palette-item-shortcut">${item.shortcut}</span>` : ''}`;
+      el.addEventListener('click', () => _executePaletteItem(el));
+      el.addEventListener('mouseenter', () => {
+        resultsEl.querySelectorAll('.palette-item.active').forEach(a => a.classList.remove('active'));
+        el.classList.add('active');
+      });
+      resultsEl.appendChild(el);
+      firstItem = false;
+    });
+  });
+}
+
+function _executePaletteItem(el) {
+  closeCommandPalette();
+  if (el.dataset.type === 'session') {
+    const idx = parseInt(el.dataset.index);
+    if (idx >= 0 && idx < sessions.length) {
+      if (typeof isAnyPanelActive === 'function' && isAnyPanelActive()) hidePanel();
+      if (sessions[idx].minimized) restoreSession(idx);
+      else setFocus(idx);
+    }
+    return;
+  }
+  // Dispatch as action
+  const id = el.dataset.id;
+  if (id && PALETTE_ACTIONS && PALETTE_ACTIONS[id]) {
+    PALETTE_ACTIONS[id]();
+  }
+}
+
+function setupCommandPalette() {
+  const overlay = document.getElementById('command-palette-overlay');
+  if (!overlay) return;
+
+  const input = document.getElementById('palette-input');
+
+  // Close on backdrop click
+  overlay.addEventListener('mousedown', (e) => {
+    if (e.target === overlay) closeCommandPalette();
+  });
+
+  // Filter on input
+  input.addEventListener('input', () => _renderPaletteResults(input.value));
+
+  // Keyboard navigation
+  input.addEventListener('keydown', (e) => {
+    const results = document.getElementById('palette-results');
+    const items = results ? Array.from(results.querySelectorAll('.palette-item')) : [];
+    const activeIdx = items.findIndex(el => el.classList.contains('active'));
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeCommandPalette();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const next = (activeIdx + 1) % items.length;
+      items.forEach((el, i) => el.classList.toggle('active', i === next));
+      items[next]?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prev = (activeIdx - 1 + items.length) % items.length;
+      items.forEach((el, i) => el.classList.toggle('active', i === prev));
+      items[prev]?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const activeEl = items[activeIdx];
+      if (activeEl) _executePaletteItem(activeEl);
+    }
+    e.stopPropagation();
+  });
+}
+
+// Expose palette actions map (populated after setupShortcuts creates ACTIONS)
+let PALETTE_ACTIONS = null;
+
 function setupShortcuts() {
   // Shift+Enter is handled by xterm's attachCustomKeyEventHandler in terminal.js.
   // This ensures the CSI u sequence reaches the PTY without xterm's default \r handling.
@@ -2138,6 +2344,7 @@ function setupShortcuts() {
     'nav-right':      { key: 'ArrowRight', meta: true,  shift: false, alt: true },
     'reopen-closed':  { key: 'z',       meta: true,  shift: true  },
     'auto-tile':      { key: 't',       meta: true,  shift: true  },
+    'command-palette': { key: 'p',      meta: true,  shift: false },
   };
 
   const ACTIONS = {
@@ -2160,7 +2367,11 @@ function setupShortcuts() {
     'nav-down':       () => { navigateDirection('down'); return true; },
     'nav-left':       () => { navigateDirection('left'); return true; },
     'nav-right':      () => { navigateDirection('right'); return true; },
+    'command-palette': () => { openCommandPalette(); return true; },
   };
+
+  // Expose actions to command palette executor
+  PALETTE_ACTIONS = ACTIONS;
 
   document.addEventListener('keydown', (e) => {
     const bindings = getShortcutBindings() || DEFAULTS;
@@ -3669,6 +3880,7 @@ function saveSessionState() {
 document.addEventListener('DOMContentLoaded', async () => {
   setupNewSessionButton();
   setupShortcuts();
+  setupCommandPalette();
   setupResizeHandles();
   setupSidebarToggle();
   setupSessionListDragDrop();

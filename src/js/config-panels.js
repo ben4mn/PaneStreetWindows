@@ -920,9 +920,10 @@ const DEFAULT_SHORTCUTS = [
   { id: 'prev-pane',        label: 'Previous pane',                key: '[',       meta: true,  shift: true,  category: 'Windows' },
   { id: 'next-pane',        label: 'Next pane',                    key: ']',       meta: true,  shift: true,  category: 'Windows' },
   { id: 'auto-tile',        label: 'Auto-tile panes',             key: 't',       meta: true,  shift: true,  category: 'Windows' },
+  { id: 'command-palette',  label: 'Open command palette',        key: 'p',       meta: true,  shift: false, category: 'Navigation' },
 ];
 
-function loadShortcuts() {
+export function loadShortcuts() {
   const saved = localStorage.getItem('ps-shortcuts');
   if (!saved) return DEFAULT_SHORTCUTS.map(s => ({ ...s }));
   try {
@@ -940,7 +941,7 @@ function saveShortcuts(shortcuts) {
   window.dispatchEvent(new CustomEvent('shortcuts-changed', { detail: shortcuts }));
 }
 
-function formatShortcut(s) {
+export function formatShortcut(s) {
   const parts = [];
   if (s.meta) parts.push(_isMac ? '\u2318' : 'Ctrl');
   if (s.shift) parts.push('\u21E7');
